@@ -6,6 +6,7 @@ import { Modal } from '@/components/ui/Modal'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Field, Input, Select } from '@/components/ui/Input'
 import { StudentFullReport } from '@/components/StudentFullReport'
+import { StudentImport } from '@/components/StudentImport'
 import { StudentCard } from '@/components/StudentCard'
 import { printElement } from '@/lib/printElement'
 import { formatCurrency, isValidEmail, isValidPhone } from '@/lib/utils'
@@ -53,6 +54,7 @@ export function StudentsPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [editing, setEditing] = useState<Student | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const [form, setForm] = useState<StudentForm>(emptyForm)
   const [saving, setSaving] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Student | null>(null)
@@ -219,6 +221,9 @@ export function StudentsPage() {
           <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Students</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">{activeStudentCount} active ({students.length} total)</p>
         </div>
+        <Button variant="secondary" onClick={() => setShowImport(true)}>
+          Import CSV
+        </Button>
         <Button onClick={openCreate}>+ Add Student</Button>
       </div>
 
@@ -367,6 +372,18 @@ export function StudentsPage() {
           </tbody>
         </table>
       </div>
+
+      {showImport && (
+        <Modal title="Import students from CSV" onClose={() => setShowImport(false)} size="xl">
+          <StudentImport
+            classes={classes}
+            onDone={() => {
+              setShowImport(false)
+              load()
+            }}
+          />
+        </Modal>
+      )}
 
       {showForm && (
         <Modal title={editing ? 'Edit Student' : 'Add Student'} onClose={() => setShowForm(false)}>
