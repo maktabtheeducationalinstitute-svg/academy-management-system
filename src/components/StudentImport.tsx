@@ -12,12 +12,12 @@ import type { Class } from '@/types/database'
 
 /** Header aliases, so a file exported from Excel or Sheets works unedited. */
 const COLUMNS: { key: string; aliases: string[]; label: string }[] = [
-  { key: 'full_name', aliases: ['full_name', 'name', 'student', 'student name'], label: 'Name' },
+  { key: 'full_name', aliases: ['full_name', 'full name', 'name', 'student', 'student name'], label: 'Name' },
   { key: 'class', aliases: ['class', 'class_name', 'grade', 'section'], label: 'Class' },
   { key: 'contact_phone', aliases: ['contact_phone', 'phone', 'student phone', 'mobile'], label: 'Phone' },
   { key: 'guardian_name', aliases: ['guardian_name', 'guardian', 'parent', 'parent name', 'father name'], label: 'Guardian' },
-  { key: 'guardian_phone', aliases: ['guardian_phone', 'parent phone', 'guardian mobile'], label: 'Guardian phone' },
-  { key: 'guardian_email', aliases: ['guardian_email', 'email', 'parent email'], label: 'Guardian email' },
+  { key: 'guardian_phone', aliases: ['guardian_phone', 'guardian phone', 'parent phone', 'guardian mobile'], label: 'Guardian phone' },
+  { key: 'guardian_email', aliases: ['guardian_email', 'guardian email', 'email', 'parent email'], label: 'Guardian email' },
   { key: 'fee_override', aliases: ['fee_override', 'monthly_fee', 'fee', 'monthly fee'], label: 'Monthly fee' },
   { key: 'admission_fee_amount', aliases: ['admission_fee_amount', 'admission_fee', 'admission fee'], label: 'Admission fee' },
   { key: 'security_fee_amount', aliases: ['security_fee_amount', 'security_fee', 'security fee'], label: 'Security fee' },
