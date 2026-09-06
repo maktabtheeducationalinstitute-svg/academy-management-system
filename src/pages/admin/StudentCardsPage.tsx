@@ -5,27 +5,22 @@ import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Input, Select } from '@/components/ui/Input'
 import { EmptyState } from '@/components/EmptyState'
-import { StudentCard } from '@/components/StudentCard'
+import { StudentCard, StudentCardBack } from '@/components/StudentCard'
 import { printElement } from '@/lib/printElement'
 import type { Class, Student } from '@/types/database'
 
-const CARDS_PER_ROW = 2
-
+// Each row holds one student's front + back, printed side by side so cutting
+// the sheet gives you a matched pair ready to glue or laminate back-to-back,
+// rather than having to hunt down that student's back card on another page.
+//
 // Chromium's print pagination doesn't reliably handle a `flex-wrap` container
 // breaking across pages — once a page break falls inside the wrapped group,
-// items after the break can each end up alone on their own row instead of
-// re-flowing into pairs (confirmed against a real multi-page print; a small
-// same-page test didn't reproduce it, which is why this wasn't caught
-// earlier). Building explicit two-item rows sidesteps the ambiguity: each
-// row is its own small, unwrapped flex container, and only the boundary
-// *between* rows ever needs to break, which browsers handle correctly.
-function chunkIntoRows<T>(items: T[], size: number): T[][] {
-  const rows: T[][] = []
-  for (let i = 0; i < items.length; i += size) {
-    rows.push(items.slice(i, i + size))
-  }
-  return rows
-}
+// items after the break can end up alone on their own row instead of
+// re-flowing (confirmed against a real multi-page print; a short same-page
+// test didn't reproduce it, which is why this wasn't caught earlier). Each
+// row being its own small, unwrapped flex container (via the `.card-row`
+// print rule) sidesteps that — only the boundary *between* rows ever needs
+// to break, which browsers handle correctly.
 
 // Every student gets a card number the moment they're admitted (assigned by a
 // database trigger), so this page never "generates" anything — it just renders
@@ -116,19 +111,18 @@ export function StudentCardsPage() {
         <EmptyState title="No cards to show" description="No students match the current filters." />
       ) : (
         <div ref={sheetRef} className="print-area card-sheet flex flex-col gap-4">
-          {chunkIntoRows(filtered, CARDS_PER_ROW).map((row, rowIdx) => (
-            <div key={rowIdx} className="card-row flex flex-wrap gap-4">
-              {row.map((s) => (
-                <div key={s.id} className="flex flex-col items-center gap-2">
-                  <StudentCard student={s} cls={s.class_id ? classById.get(s.class_id) : undefined} />
-                  <button
-                    onClick={() => setPrintOne(s)}
-                    className="no-print text-xs font-medium text-brand-600 hover:underline dark:text-gold-400"
-                  >
-                    Print this card
-                  </button>
-                </div>
-              ))}
+          {filtered.map((s) => (
+            <div key={s.id} className="card-row flex flex-wrap items-start justify-center gap-4">
+              <StudentCard student={s} cls={s.class_id ? classById.get(s.class_id) : undefined} />
+              <div className="flex flex-col items-center gap-2">
+                <StudentCardBack />
+                <button
+                  onClick={() => setPrintOne(s)}
+                  className="no-print text-xs font-medium text-brand-600 hover:underline dark:text-gold-400"
+                >
+                  Print this card
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -138,7 +132,10 @@ export function StudentCardsPage() {
         <Modal title={`Student Card — ${printOne.full_name}`} onClose={() => setPrintOne(null)}>
           <div className="flex flex-col items-center gap-4">
             <div ref={singleRef} className="print-area card-sheet">
-              <StudentCard student={printOne} cls={printOne.class_id ? classById.get(printOne.class_id) : undefined} />
+              <div className="card-row flex flex-wrap items-start justify-center gap-4">
+                <StudentCard student={printOne} cls={printOne.class_id ? classById.get(printOne.class_id) : undefined} />
+                <StudentCardBack />
+              </div>
             </div>
             <div className="no-print flex justify-end gap-2 self-stretch">
               <Button variant="secondary" onClick={() => setPrintOne(null)}>
