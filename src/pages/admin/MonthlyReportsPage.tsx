@@ -21,6 +21,8 @@ export function MonthlyReportsPage() {
   const [monthValue, setMonthValue] = useState(currentMonthValue())
   const [classFilter, setClassFilter] = useState('all')
   const [sendingId, setSendingId] = useState<string | null>(null)
+  const [sendingAll, setSendingAll] = useState(false)
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null)
 
   const monthStart = monthValueToDate(monthValue)
   const monthEnd = monthValueToDate(shiftMonthValue(monthValue, 1))
@@ -94,20 +96,16 @@ export function MonthlyReportsPage() {
   )
 
   const filtered = classFilter === 'all' ? students : students.filter((s) => s.class_id === classFilter)
+  const eligible = filtered.filter((s) => s.guardian_email)
 
-  // Generates the PDF and sends it in one pass, per student — never persisted
-  // to a table/bucket, and the base64 string is a local variable that falls
-  // out of scope (and gets garbage-collected) once the send completes. If a
-  // bulk "send to all" ever gets added, keep this same one-at-a-time shape
-  // (await each send before starting the next) rather than pre-building an
-  // array of every student's PDF up front, which would hold all of them in
-  // memory simultaneously.
-  async function sendTestReport(student: Student) {
+  // Builds and sends one student's report, without touching any loading
+  // state or reloading data — both the per-row button and "Send to All"
+  // call this and handle those themselves, so the bulk path can send one
+  // at a time (see below) instead of duplicating this logic.
+  async function sendReportTo(student: Student): Promise<{ ok: boolean; error?: string }> {
     if (!student.guardian_email) {
-      show('No guardian email on file for this student.', 'error')
-      return
+      return { ok: false, error: 'No guardian email on file for this student.' }
     }
-    setSendingId(student.id)
     try {
       const className = student.class_id ? classById.get(student.class_id)?.name ?? '' : ''
       const studentAttendance = attendance
@@ -139,29 +137,82 @@ export function MonthlyReportsPage() {
         body: { studentId: student.id, month: monthStart, pdfBase64 },
       })
       if (error) {
-        show(await edgeFunctionError(error, 'Failed to send report.'), 'error')
-        return
+        return { ok: false, error: await edgeFunctionError(error, 'Failed to send report.') }
       }
       const result = data as { error?: string; success?: boolean }
       if (result?.error) {
-        show(result.error, 'error')
-        return
+        return { ok: false, error: result.error }
       }
-      show(`Report emailed to ${student.guardian_email}, with PDF attached.`)
-      load()
-    } finally {
-      setSendingId(null)
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
     }
+  }
+
+  async function sendTestReport(student: Student) {
+    setSendingId(student.id)
+    const result = await sendReportTo(student)
+    setSendingId(null)
+    if (!result.ok) {
+      show(result.error ?? 'Failed to send report.', 'error')
+      return
+    }
+    show(`Report emailed to ${student.guardian_email}, with PDF attached.`)
+    load()
+  }
+
+  // Sends one at a time, awaiting each before starting the next — never
+  // builds every student's PDF up front, so memory use stays flat
+  // regardless of how many students are in view (see sendReportTo's own
+  // comment history for why that matters).
+  async function sendAllReports() {
+    if (eligible.length === 0) {
+      show('No students in this view have a guardian email on file.', 'error')
+      return
+    }
+    setSendingAll(true)
+    let sent = 0
+    const failures: string[] = []
+    for (let i = 0; i < eligible.length; i++) {
+      setBulkProgress({ done: i, total: eligible.length })
+      const student = eligible[i]
+      const result = await sendReportTo(student)
+      if (result.ok) sent++
+      else failures.push(`${student.full_name}: ${result.error ?? 'failed'}`)
+    }
+    setBulkProgress(null)
+    setSendingAll(false)
+    if (failures.length === 0) {
+      show(`Sent ${sent} of ${eligible.length} report${eligible.length === 1 ? '' : 's'}.`)
+    } else {
+      show(`Sent ${sent} of ${eligible.length}. ${failures.length} failed: ${failures.slice(0, 3).join('; ')}${failures.length > 3 ? '…' : ''}`, 'error')
+    }
+    load()
   }
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Monthly Reports</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Send a combined attendance + exam report email to a guardian for one month. Manual test-send only for now —
-          nothing goes out automatically yet.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Monthly Reports</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Send a combined attendance + exam report email to a guardian for one month. Sending is always
+            triggered by hand here — nothing goes out on a schedule.
+          </p>
+        </div>
+        <div className="flex flex-col items-end gap-1">
+          <Button onClick={sendAllReports} disabled={sendingAll || sendingId !== null || eligible.length === 0}>
+            {sendingAll
+              ? `Sending... (${bulkProgress ? bulkProgress.done + 1 : 0}/${bulkProgress?.total ?? eligible.length})`
+              : `Send to All (${eligible.length})`}
+          </Button>
+          {filtered.length > eligible.length && (
+            <p className="text-xs text-slate-400 dark:text-slate-500">
+              {filtered.length - eligible.length} student{filtered.length - eligible.length === 1 ? '' : 's'} in this
+              view have no guardian email and will be skipped.
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800 sm:grid-cols-2">
@@ -243,7 +294,7 @@ export function MonthlyReportsPage() {
                       {s.guardian_email ? (
                         <button
                           onClick={() => sendTestReport(s)}
-                          disabled={sendingId === s.id}
+                          disabled={sendingId === s.id || sendingAll}
                           className="text-sm text-brand-600 hover:underline disabled:opacity-50 dark:text-gold-400"
                         >
                           {sendingId === s.id ? 'Sending...' : 'Send Test Report'}
