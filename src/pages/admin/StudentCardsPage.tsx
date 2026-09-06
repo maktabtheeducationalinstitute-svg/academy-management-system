@@ -115,7 +115,7 @@ export function StudentCardsPage() {
             <div key={s.id} className="card-row flex flex-wrap items-start justify-center gap-4">
               <StudentCard student={s} cls={s.class_id ? classById.get(s.class_id) : undefined} />
               <div className="flex flex-col items-center gap-2">
-                <StudentCardBack />
+                <StudentCardBack student={s} />
                 <button
                   onClick={() => setPrintOne(s)}
                   className="no-print text-xs font-medium text-brand-600 hover:underline dark:text-gold-400"
@@ -134,7 +134,7 @@ export function StudentCardsPage() {
             <div ref={singleRef} className="print-area card-sheet">
               <div className="card-row flex flex-wrap items-start justify-center gap-4">
                 <StudentCard student={printOne} cls={printOne.class_id ? classById.get(printOne.class_id) : undefined} />
-                <StudentCardBack />
+                <StudentCardBack student={printOne} />
               </div>
             </div>
             <div className="no-print flex justify-end gap-2 self-stretch">

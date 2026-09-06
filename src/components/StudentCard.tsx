@@ -53,20 +53,21 @@ export function StudentCard({ student, cls }: { student: Student; cls?: Class })
 // The reverse side of the card — same physical size and branding as the
 // front, so the two sit together as one printed pair (see StudentCardsPage,
 // which lays out each student's front next to their back rather than two
-// different students' fronts). Carries the institute's real address (the
-// same one already used on exam papers) rather than inventing a fake one,
-// a property/return notice, and a signature line — the standard back-of-ID
-// elements, generic enough to hold for every student rather than needing
-// their own data.
-export function StudentCardBack() {
+// different students' fronts). The student's name is repeated here so the
+// back alone still identifies whose card it is; everything else — the
+// institute's real address (the same one already used on exam papers,
+// not an invented one), the property/return notice, and the signature
+// line — is the same standard back-of-ID content for every student.
+export function StudentCardBack({ student }: { student: Student }) {
   return (
     <div
       className="student-card flex flex-col items-center overflow-hidden rounded-lg border border-[#c3ccec] bg-white px-4 py-3 text-center text-black shadow-sm"
       style={{ width: '90mm', height: '55mm' }}
     >
       <img src={logoUrl} alt="" className="h-8 w-auto shrink-0" />
-      <div className="mt-1 leading-tight">
-        <p className="text-[9px] font-semibold text-[#1e2a6b]">Maktab - The Educational Institute</p>
+      <p className="mt-1 truncate text-[10px] font-bold text-[#1e2a6b]">{student.full_name}</p>
+      <div className="mt-0.5 leading-tight">
+        <p className="text-[8px] font-semibold text-[#3a4a9c]">Maktab - The Educational Institute</p>
         <p className="mt-0.5 text-[6px] leading-snug text-slate-500">{SCHOOL_ADDRESS}</p>
       </div>
       <p className="mt-2 flex-1 text-[7px] leading-snug text-slate-600">
