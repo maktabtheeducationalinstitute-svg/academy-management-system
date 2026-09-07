@@ -7,6 +7,17 @@ import { ThemeToggle } from '@/components/ThemeToggle'
 import { Modal } from '@/components/ui/Modal'
 import logoUrl from '@/assets/maktab_logo_transparent.png'
 
+// What the system actually does, in the office's own terms rather than by
+// feature name. Kept short: this is read once, by someone signing in.
+const FEATURES = [
+  'Admissions, student records and printable ID cards',
+  'Barcode attendance with sign-in and sign-out times',
+  'Monthly fee invoices, challans and payment history',
+  'Exam papers from a question bank, marks and results',
+  'Attendance and result reports emailed to guardians',
+  'Timetables, course planners and teacher salaries',
+]
+
 const APP_VERSION = '0.1.0'
 
 function MailIcon() {
@@ -136,6 +147,15 @@ export function Login() {
       </p>
 
       <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-gradient-to-br from-brand-700 via-brand-800 to-brand-900 p-12 lg:flex">
+        {/* The crest again, oversized and faint behind the copy. Decorative
+            only, so it is hidden from assistive tech and never intercepts a
+            click on the text above it. */}
+        <img
+          src={logoUrl}
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute -bottom-16 -right-20 w-[36rem] max-w-none opacity-[0.06] select-none"
+        />
         <div className="relative flex items-center gap-5">
           <img src={logoUrl} alt="Maktab - The Educational Institute crest" className="h-24 w-auto" />
           <div>
@@ -150,11 +170,17 @@ export function Login() {
             simplified in one system.
           </h1>
           <p className="mt-4 max-w-sm text-sm text-cream-200/80">
-            Maktab - The Educational Institute runs its entire academic and administrative life from this
-            one dashboard. Admissions, attendance, fees, examinations, salaries, and timetables stay
-            connected in a single secure system, so staff always see accurate, current information
-            without juggling spreadsheets or paper registers.
+            One dashboard for the academy&rsquo;s whole academic and administrative life &mdash; no
+            spreadsheets, no paper registers.
           </p>
+          <ul className="mt-6 max-w-md space-y-2.5">
+            {FEATURES.map((feature) => (
+              <li key={feature} className="flex items-start gap-2.5 text-sm text-cream-100/90">
+                <span aria-hidden="true" className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gold-400" />
+                <span>{feature}</span>
+              </li>
+            ))}
+          </ul>
         </div>
         <p className="relative text-xs text-cream-200/50">
           &copy; {new Date().getFullYear()} Maktab - The Educational Institute
