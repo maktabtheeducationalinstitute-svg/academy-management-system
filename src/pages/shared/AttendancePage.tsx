@@ -17,31 +17,22 @@ function todayStr(): string {
 }
 
 const REVIEW_LABEL: Record<AttendanceReviewReason, string> = {
-  no_check_in: 'No sign-in',
   very_late: 'Very late',
-  short_stay: 'Short stay',
 }
 
 // What the desk scanner recorded for one student on this date. A dash means
 // nobody scanned a card — the row is whatever the teacher marks by hand.
 function ScanCell({ row }: { row: Attendance | undefined }) {
-  if (!row || (!row.check_in_at && !row.check_out_at)) {
+  if (!row || !row.check_in_at) {
     return <span className="text-slate-300 dark:text-slate-600">—</span>
   }
 
   return (
     <div className="leading-tight">
       <span className="tabular-nums text-slate-700 dark:text-slate-200">
-        {row.check_in_at ? formatClockTime(row.check_in_at) : '??'}
-        {' – '}
-        {row.check_out_at ? formatClockTime(row.check_out_at) : 'still in'}
+        {formatClockTime(row.check_in_at)}
       </span>
       <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px]">
-        {/* The stored total, not last-out minus first-in: a student who left at
-            break and came back must not be credited for the gap. */}
-        {row.minutes_present !== null && (
-          <span className="text-slate-400 dark:text-slate-500">{formatMinutes(row.minutes_present)}</span>
-        )}
         {row.status === 'late' && row.late_minutes !== null && (
           <span className="text-amber-600 dark:text-amber-400">{formatMinutes(row.late_minutes)} late</span>
         )}
@@ -324,7 +315,7 @@ export function AttendancePage() {
               <thead className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs uppercase text-slate-500 dark:text-slate-400">
                 <tr>
                   <th className="px-4 py-3">Student</th>
-                  <th className="no-print px-4 py-3">Scanned</th>
+                  <th className="no-print px-4 py-3">Signed in</th>
                   <th className="px-4 py-3">Present</th>
                   <th className="px-4 py-3">Absent</th>
                   <th className="px-4 py-3">Late</th>

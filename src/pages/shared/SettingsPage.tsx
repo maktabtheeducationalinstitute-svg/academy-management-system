@@ -22,21 +22,6 @@ const TIMING_FIELDS = [
     label: 'Very late after (minutes)',
     help: 'Past this, the arrival is flagged for the office as well as marked late.',
   },
-  {
-    key: 'arrival_cutoff_minutes' as const,
-    label: 'Arrival cutoff (minutes)',
-    help: 'Past this, a first scan of the day is treated as going home, not arriving — the student still counts present, but the missing sign-in is flagged.',
-  },
-  {
-    key: 'min_stay_minutes' as const,
-    label: 'Minimum stay (minutes)',
-    help: 'A visit shorter than this is flagged as a short stay.',
-  },
-  {
-    key: 'rescan_window_seconds' as const,
-    label: 'Ignore repeat scans within (seconds)',
-    help: 'Stops a scanner that reads a card twice from signing the student straight back out.',
-  },
 ]
 
 /**
@@ -80,10 +65,6 @@ export function SettingsPage() {
     }
     if (payload.grace_minutes > payload.very_late_minutes) {
       show('The grace period cannot be longer than the very-late threshold.', 'error')
-      return
-    }
-    if (payload.very_late_minutes > payload.arrival_cutoff_minutes) {
-      show('The very-late threshold cannot be later than the arrival cutoff.', 'error')
       return
     }
 

@@ -36,17 +36,8 @@ interface ScanResult {
     /** What this particular scan did — the desk shows in/out, not a status. */
     action: ScanAction
     status: AttendanceStatus
-    /** When this particular card read happened. */
-    scanned_at: string | null
     check_in_at: string | null
-    check_out_at: string | null
     late_minutes: number | null
-    /** Total of every sitting today. */
-    minutes_present: number | null
-    /** Length of the sitting this scan closed, on the way out only. */
-    session_minutes: number | null
-    /** Sign-ins so far today. 2+ means the student left and came back. */
-    entry_count: number
     review_reason: AttendanceReviewReason | null
   }
   // The RPC also returns the outstanding amounts and the unpaid month list.
@@ -60,7 +51,6 @@ interface ScanResult {
 // One row of the persisted day log, from recent_attendance_scans().
 interface ScanLogRow {
   scanned_at: string
-  kind: 'check_in' | 'check_out'
   full_name: string
   class_name: string | null
   review_reason: AttendanceReviewReason | null
@@ -108,7 +98,7 @@ export function ScannerPage() {
           name: row.full_name,
           className: row.class_name,
           time: formatTime(row.scanned_at),
-          action: row.kind,
+          action: 'check_in' as const,
           // Fee status is a live lookup done at scan time; the day log does not
           // carry it, so an older row simply does not claim anything about fees.
           overdue: false,
@@ -162,11 +152,11 @@ export function ScannerPage() {
     setScanSeq((n) => n + 1)
     if (scan.ok && scan.student && scan.attendance) {
       const a = scan.attendance
-      const stamp = a.scanned_at ?? (a.action === 'check_in' ? a.check_in_at : a.check_out_at)
+      const stamp = a.check_in_at
       setHistory((prev) =>
         [
           {
-            key: `${a.scanned_at ?? Date.now()}-live`,
+            key: `${a.check_in_at ?? Date.now()}-live`,
             name: scan.student!.full_name,
             className: scan.student!.class_name,
             time: formatTime(stamp),
@@ -200,7 +190,7 @@ export function ScannerPage() {
             Attendance Desk
           </h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Scan a card to sign in. Scan it again on the way out to sign out.
+            Scan a student card to sign them in for today.
           </p>
         </div>
         <DeskClock />
@@ -266,11 +256,7 @@ export function ScannerPage() {
             action={attendance.action}
             status={attendance.status}
             checkInAt={attendance.check_in_at}
-            checkOutAt={attendance.check_out_at}
             lateMinutes={attendance.late_minutes}
-            sessionMinutes={attendance.session_minutes}
-            minutesPresent={attendance.minutes_present}
-            entryCount={attendance.entry_count}
             reviewReason={attendance.review_reason}
           />
 

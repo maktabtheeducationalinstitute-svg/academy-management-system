@@ -2,10 +2,10 @@ import type { ReactNode } from 'react'
 import type { AttendanceReviewReason, AttendanceStatus } from '@/types/database'
 import { formatClockTime, formatMinutes } from '@/lib/utils'
 import { StudentAvatar } from './StudentAvatar'
-import { ClockIcon, FlagIcon, IdCardIcon, LogInIcon, LogOutIcon, RotateCcwIcon, UserIcon } from './icons'
+import { ClockIcon, FlagIcon, IdCardIcon, LogInIcon, RotateCcwIcon, UserIcon } from './icons'
 
-/** Which direction the card just took the student. */
-export type ScanAction = 'check_in' | 'check_out' | 'duplicate'
+/** What a card read did. There is no departure — a repeat is just a repeat. */
+export type ScanAction = 'check_in' | 'duplicate'
 
 export interface ScanResultCardProps {
   name: string
@@ -14,15 +14,8 @@ export interface ScanResultCardProps {
   action: ScanAction
   status: AttendanceStatus
   checkInAt: string | null
-  checkOutAt: string | null
   /** Minutes past the scheduled start. Null when there was no check-in to be late for. */
   lateMinutes: number | null
-  /** Length of the sitting this scan just closed. Null on the way in. */
-  sessionMinutes: number | null
-  /** Total of every sitting today, so a return visit adds to it. */
-  minutesPresent: number | null
-  /** How many times the student has signed in today. 2+ means they came back. */
-  entryCount: number
   reviewReason: AttendanceReviewReason | null
 }
 
@@ -33,13 +26,6 @@ const tone = {
     status: 'text-green-700 dark:text-green-300',
     label: 'Signed in',
     icon: <LogInIcon size={14} strokeWidth={2.5} />,
-  },
-  check_out: {
-    shell: 'border-sky-500/60 bg-sky-50 dark:border-sky-600/50 dark:bg-sky-950/30',
-    badge: 'bg-sky-600 ring-sky-50 dark:bg-sky-600 dark:ring-sky-950',
-    status: 'text-sky-700 dark:text-sky-300',
-    label: 'Signed out',
-    icon: <LogOutIcon size={14} strokeWidth={2.5} />,
   },
   duplicate: {
     shell: 'border-amber-400/70 bg-amber-50 dark:border-amber-600/50 dark:bg-amber-950/30',
@@ -54,10 +40,7 @@ const tone = {
 // is not the person who resolves these, so each one says what the office will
 // need to sort out rather than naming the rule that fired.
 const reviewNote: Record<AttendanceReviewReason, string> = {
-  no_check_in:
-    'No sign-in was recorded this morning — counted present from this scan, but the office will need to confirm the arrival time.',
   very_late: 'Arrived well after the class started. Flagged for the office.',
-  short_stay: 'Signed out very soon after signing in. Flagged for the office.',
 }
 
 function MetaItem({ icon, children }: { icon: ReactNode; children: ReactNode }) {
@@ -78,42 +61,18 @@ export function ScanResultCard({
   action,
   status,
   checkInAt,
-  checkOutAt,
   lateMinutes,
-  sessionMinutes,
-  minutesPresent,
-  entryCount,
   reviewReason,
 }: ScanResultCardProps) {
-  // A student who left and came back is a different thing from a first arrival,
-  // and the desk should not have to work that out from the clock.
-  const isReturn = action === 'check_in' && entryCount > 1
   const t = tone[action]
-  const label = isReturn ? 'Signed back in' : t.label
-  // Whichever end of the day this scan just wrote is the time to show big.
-  const stamp = action === 'check_in' ? checkInAt : (checkOutAt ?? checkInAt)
+  const label = t.label
+  const stamp = checkInAt
 
-  // One line of context under the headline time: on the way in, how late they
-  // are; on the way out, how long they were actually here. Lateness is only
-  // called out once the register actually says 'late' — a student inside the
-  // grace period is on time, and telling the desk "5m late" would contradict
-  // the row that was just written.
-  let detail: string | null = null
-  if (action === 'check_out' && checkInAt === null) {
-    detail = 'No sign-in recorded'
-  } else if (action === 'check_out' && sessionMinutes !== null) {
-    // This sitting, plus the running total when there was more than one.
-    detail =
-      entryCount > 1 && minutesPresent !== null
-        ? `${formatMinutes(sessionMinutes)} this visit · ${formatMinutes(minutesPresent)} today`
-        : `${formatMinutes(sessionMinutes)} in the academy`
-  } else if (isReturn) {
-    detail = `Back in · visit ${entryCount} today`
-  } else if (status === 'late' && lateMinutes !== null) {
-    detail = `${formatMinutes(lateMinutes)} late`
-  } else if (action === 'check_in') {
-    detail = 'On time'
-  }
+  // One line of context under the headline time. Lateness is only called out
+  // once the register actually says 'late' — a student inside the grace period
+  // is on time, and telling the desk "5m late" would contradict the row that
+  // was just written.
+  const detail = status === 'late' && lateMinutes !== null ? `${formatMinutes(lateMinutes)} late` : 'On time'
 
   return (
     <section
@@ -140,14 +99,6 @@ export function ScanResultCard({
               <span className="font-mono tracking-wide">{barcode}</span>
             </MetaItem>
           </div>
-          {/* Both ends of the day, once both exist — the desk can answer "when
-              did they get here?" without opening the register. */}
-          {checkInAt && checkOutAt && (
-            <p className="mt-1.5 text-xs tabular-nums text-slate-500 dark:text-slate-400">
-              {entryCount > 1 ? 'First in' : 'In'} {formatClockTime(checkInAt)} ·{' '}
-              {entryCount > 1 ? 'last out' : 'Out'} {formatClockTime(checkOutAt)}
-            </p>
-          )}
         </div>
 
         <div className="shrink-0 text-left sm:text-right">
@@ -162,7 +113,7 @@ export function ScanResultCard({
 
       {action === 'duplicate' && (
         <p className="border-t border-amber-400/40 bg-amber-100/50 px-4 py-2 text-xs text-amber-800 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-200 sm:px-6">
-          That card was read a moment ago — this scan was ignored so it did not sign them straight back out.
+          Already signed in today at {formatClockTime(checkInAt)} — this scan changed nothing.
         </p>
       )}
 
