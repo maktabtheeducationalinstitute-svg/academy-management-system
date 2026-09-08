@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { signStudentPhotos } from '@/lib/studentPhotos'
 import { useToast } from '@/context/ToastContext'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
@@ -28,6 +29,7 @@ import type { Class, Student } from '@/types/database'
 export function StudentCardsPage() {
   const { show } = useToast()
   const [students, setStudents] = useState<Student[]>([])
+  const [photoUrls, setPhotoUrls] = useState<Map<string, string>>(new Map())
   const [classes, setClasses] = useState<Class[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -45,7 +47,14 @@ export function StudentCardsPage() {
         supabase.from('classes').select('*').order('name'),
       ])
       if (studentsRes.error) show(studentsRes.error.message, 'error')
-      else setStudents(studentsRes.data as Student[])
+      else {
+        const roll = studentsRes.data as Student[]
+        setStudents(roll)
+        // Signed in one call for the whole roll: printing a class of cards
+        // needs every photo at once, and a link per card would be a request
+        // per card. A photo that fails to sign just prints as initials.
+        setPhotoUrls(await signStudentPhotos(roll))
+      }
       if (classesRes.error) show(classesRes.error.message, 'error')
       else setClasses(classesRes.data as Class[])
       setLoading(false)
@@ -113,7 +122,11 @@ export function StudentCardsPage() {
         <div ref={sheetRef} className="print-area card-sheet flex flex-col gap-4">
           {filtered.map((s) => (
             <div key={s.id} className="card-row flex flex-wrap items-start justify-center gap-4">
-              <StudentCard student={s} cls={s.class_id ? classById.get(s.class_id) : undefined} />
+              <StudentCard
+                student={s}
+                cls={s.class_id ? classById.get(s.class_id) : undefined}
+                photoUrl={photoUrls.get(s.id)}
+              />
               <div className="flex flex-col items-center gap-2">
                 <StudentCardBack student={s} />
                 <button
@@ -133,7 +146,11 @@ export function StudentCardsPage() {
           <div className="flex flex-col items-center gap-4">
             <div ref={singleRef} className="print-area card-sheet">
               <div className="card-row flex flex-wrap items-start justify-center gap-4">
-                <StudentCard student={printOne} cls={printOne.class_id ? classById.get(printOne.class_id) : undefined} />
+                <StudentCard
+                  student={printOne}
+                  cls={printOne.class_id ? classById.get(printOne.class_id) : undefined}
+                  photoUrl={photoUrls.get(printOne.id)}
+                />
                 <StudentCardBack student={printOne} />
               </div>
             </div>

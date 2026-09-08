@@ -1,6 +1,7 @@
 import { Barcode } from '@/components/Barcode'
 import logoUrl from '@/assets/maktab_logo_transparent.png'
 import { SCHOOL_ADDRESS } from '@/lib/examPaper'
+import { initialsOf } from '@/lib/studentPhotos'
 import type { Class, Student } from '@/types/database'
 
 // A student's printable ID card. Fixed physical dimensions (90mm x 55mm — a
@@ -14,7 +15,16 @@ import type { Class, Student } from '@/types/database'
 //
 // Deliberately not theme-aware: the card is always light-on-white regardless of
 // the app's dark mode, because a dark card neither prints nor scans.
-export function StudentCard({ student, cls }: { student: Student; cls?: Class }) {
+export function StudentCard({
+  student,
+  cls,
+  photoUrl,
+}: {
+  student: Student
+  cls?: Class
+  /** Signed link to the student's photo. Undefined prints initials instead. */
+  photoUrl?: string
+}) {
   return (
     <div
       className="student-card flex flex-col overflow-hidden rounded-lg border border-[#c3ccec] bg-white text-black shadow-sm"
@@ -31,7 +41,20 @@ export function StudentCard({ student, cls }: { student: Student; cls?: Class })
         </p>
       </div>
 
-      <div className="flex flex-1 flex-col justify-between px-3 py-2">
+      <div className="flex flex-1 gap-2.5 px-3 py-2">
+        {/* Fixed 4:5 frame whether or not there is a photo, so a card with one
+            and a card without print at exactly the same size. */}
+        <div className="mt-0.5 flex h-[24mm] w-[19.2mm] shrink-0 items-center justify-center overflow-hidden rounded border border-[#c3ccec] bg-[#eef1fa]">
+          {photoUrl ? (
+            <img src={photoUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <span className="text-[13px] font-bold tracking-wide text-[#8b97c7]">
+              {initialsOf(student.full_name)}
+            </span>
+          )}
+        </div>
+
+        <div className="flex min-w-0 flex-1 flex-col justify-between">
         <div className="leading-tight">
           <p className="truncate text-[13px] font-bold text-[#1e2a6b]">{student.full_name}</p>
           <div className="mt-1 grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-[8px] text-slate-700">
@@ -44,7 +67,8 @@ export function StudentCard({ student, cls }: { student: Student; cls?: Class })
           </div>
         </div>
 
-        <Barcode value={student.barcode} height={38} />
+        <Barcode value={student.barcode} height={30} />
+        </div>
       </div>
     </div>
   )

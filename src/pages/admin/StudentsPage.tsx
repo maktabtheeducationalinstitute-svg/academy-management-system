@@ -7,6 +7,8 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Field, Input, Select } from '@/components/ui/Input'
 import { StudentFullReport } from '@/components/StudentFullReport'
 import { StudentImport } from '@/components/StudentImport'
+import { StudentPhotoField } from '@/components/StudentPhotoField'
+import { deletePhoto, signStudentPhotos, uploadPhoto } from '@/lib/studentPhotos'
 import { StudentCard } from '@/components/StudentCard'
 import { printElement } from '@/lib/printElement'
 import { formatCurrency, isValidEmail, isValidPhone } from '@/lib/utils'
@@ -56,6 +58,11 @@ export function StudentsPage() {
   const [showForm, setShowForm] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [form, setForm] = useState<StudentForm>(emptyForm)
+  // The photo is held aside until the form is saved, so abandoning a
+  // half-filled form never leaves an orphaned file in the bucket.
+  const [photoBlob, setPhotoBlob] = useState<Blob | null>(null)
+  const [dropPhoto, setDropPhoto] = useState(false)
+  const [photoUrls, setPhotoUrls] = useState<Map<string, string>>(new Map())
   const [saving, setSaving] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Student | null>(null)
   const [reportCardFor, setReportCardFor] = useState<Student | null>(null)
@@ -71,7 +78,11 @@ export function StudentsPage() {
       supabase.from('classes').select('*').order('name'),
     ])
     if (studentsRes.error) show(studentsRes.error.message, 'error')
-    else setStudents(studentsRes.data as Student[])
+    else {
+      const roll = studentsRes.data as Student[]
+      setStudents(roll)
+      setPhotoUrls(await signStudentPhotos(roll))
+    }
     if (classesRes.error) show(classesRes.error.message, 'error')
     else setClasses(classesRes.data as Class[])
     setLoading(false)
@@ -100,7 +111,13 @@ export function StudentsPage() {
     return true
   })
 
+  function resetPhotoState() {
+    setPhotoBlob(null)
+    setDropPhoto(false)
+  }
+
   function openCreate() {
+    resetPhotoState()
     setEditing(null)
     setForm(emptyForm)
     setError(null)
@@ -108,6 +125,7 @@ export function StudentsPage() {
   }
 
   function openEdit(s: Student) {
+    resetPhotoState()
     setEditing(s)
     setForm({
       full_name: s.full_name,
@@ -185,14 +203,36 @@ export function StudentsPage() {
     }
 
     const result = editing
-      ? await supabase.from('students').update(payload).eq('id', editing.id)
+      ? await supabase.from('students').update(payload).eq('id', editing.id).select().single()
       : await supabase.from('students').insert(payload).select().single()
 
-    setSaving(false)
     if (result.error) {
+      setSaving(false)
       setError(friendlyError(result.error.message))
       return
     }
+
+    // The photo is stored under the student's id, so it can only be uploaded
+    // once the row exists. A failure here is reported but does not undo the
+    // save — the student is admitted, just without a picture yet.
+    const saved = result.data as Student | null
+    if (saved) {
+      try {
+        if (photoBlob) {
+          const path = await uploadPhoto(saved.id, photoBlob)
+          if (path !== saved.photo_path) {
+            await supabase.from('students').update({ photo_path: path }).eq('id', saved.id)
+          }
+        } else if (dropPhoto && saved.photo_path) {
+          await deletePhoto(saved.photo_path)
+          await supabase.from('students').update({ photo_path: null }).eq('id', saved.id)
+        }
+      } catch (e) {
+        show(e instanceof Error ? e.message : 'The student was saved, but the photo could not be.', 'error')
+      }
+    }
+
+    setSaving(false)
     show(editing ? 'Student updated.' : 'Student added.')
     setShowForm(false)
     // A card number is assigned by the database the moment the student row is
@@ -437,6 +477,13 @@ export function StudentsPage() {
                 />
               </Field>
             </div>
+            <StudentPhotoField
+              studentName={form.full_name}
+              existingUrl={editing ? photoUrls.get(editing.id) : undefined}
+              onPick={setPhotoBlob}
+              onRemove={() => setDropPhoto(true)}
+            />
+
             <Field label="Guardian email (for fee reminders)">
               <Input
                 type="email"
@@ -536,6 +583,7 @@ export function StudentsPage() {
             </p>
             <div ref={newCardPrintRef} className="print-area card-sheet">
               <StudentCard
+                photoUrl={photoUrls.get(newCardFor.id)}
                 student={newCardFor}
                 cls={newCardFor.class_id ? classById.get(newCardFor.class_id) : undefined}
               />

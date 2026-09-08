@@ -66,6 +66,11 @@ export interface Student {
   guardian_name: string | null
   guardian_phone: string | null
   guardian_email: string | null
+  /**
+   * Path within the private student-photos bucket, never a URL — signed links
+   * expire, so a stored one would rot. Null until a photo is uploaded.
+   */
+  photo_path: string | null
   enrollment_status: EnrollmentStatus
   fee_override: number | null
   admission_fee_amount: number
@@ -342,6 +347,7 @@ export interface Database {
         Row: Student
         Insert: InsertOf<
           Student,
+          | 'photo_path'
           | 'id'
           | 'barcode'
           | 'class_id'
