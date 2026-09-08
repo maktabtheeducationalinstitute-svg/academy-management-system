@@ -144,7 +144,7 @@ export function StudentCardsPage() {
       {printOne && (
         <Modal title={`Student Card — ${printOne.full_name}`} onClose={() => setPrintOne(null)}>
           <div className="flex flex-col items-center gap-4">
-            <div ref={singleRef} className="print-area card-sheet">
+            <div ref={singleRef} className="print-area no-watermark card-sheet">
               <div className="card-row flex flex-wrap items-start justify-center gap-4">
                 <StudentCard
                   student={printOne}

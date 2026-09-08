@@ -17,6 +17,12 @@ export interface ScanResultCardProps {
   /** Minutes past the scheduled start. Null when there was no check-in to be late for. */
   lateMinutes: number | null
   reviewReason: AttendanceReviewReason | null
+  /**
+   * Whether the account is behind on fees. Recolours the whole card rather
+   * than adding another badge: the desk reads this across a queue, and a
+   * colour is seen before any word on the card is.
+   */
+  feeOverdue: boolean
 }
 
 const tone = {
@@ -34,6 +40,15 @@ const tone = {
     label: 'Just scanned',
     icon: <RotateCcwIcon size={13} strokeWidth={2.5} />,
   },
+} as const
+
+// An overdue account overrides the direction colour entirely. The desk is
+// looking at the card to decide whether to wave the student through or send
+// them to the office, and that decision is the fee one.
+const overdueTone = {
+  shell: 'border-red-500/70 bg-red-50 dark:border-red-600/50 dark:bg-red-950/30',
+  badge: 'bg-red-600 ring-red-50 dark:bg-red-600 dark:ring-red-950',
+  status: 'text-red-700 dark:text-red-300',
 } as const
 
 // Plain-language rendering of the review flags the RPC sets. The receptionist
@@ -63,8 +78,10 @@ export function ScanResultCard({
   checkInAt,
   lateMinutes,
   reviewReason,
+  feeOverdue,
 }: ScanResultCardProps) {
-  const t = tone[action]
+  const base = tone[action]
+  const t = feeOverdue ? { ...base, ...overdueTone } : base
   const label = t.label
   const stamp = checkInAt
 

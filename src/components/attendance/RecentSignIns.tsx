@@ -56,7 +56,11 @@ export function RecentSignIns({ entries }: { entries: SignInEntry[] }) {
           {entries.map((entry) => (
             <li
               key={entry.key}
-              className="flex items-center gap-3 px-4 py-2 transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-700/30"
+              className={`flex items-center gap-3 px-4 py-2 transition-colors ${
+                entry.overdue
+                  ? 'bg-red-50 hover:bg-red-100/70 dark:bg-red-950/30 dark:hover:bg-red-950/50'
+                  : 'bg-green-50/40 hover:bg-green-50 dark:bg-green-950/15 dark:hover:bg-green-950/30'
+              }`}
             >
               <StudentAvatar name={entry.name} />
               <div className="min-w-0 flex-1 leading-tight">

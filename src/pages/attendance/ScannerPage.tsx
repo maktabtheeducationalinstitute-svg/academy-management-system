@@ -258,6 +258,7 @@ export function ScannerPage() {
             checkInAt={attendance.check_in_at}
             lateMinutes={attendance.late_minutes}
             reviewReason={attendance.review_reason}
+            feeOverdue={!!fee?.overdue}
           />
 
           {/* Sits directly under the confirmation rather than above it: the desk

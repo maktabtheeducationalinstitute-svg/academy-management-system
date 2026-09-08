@@ -581,7 +581,7 @@ export function StudentsPage() {
               <strong>{newCardFor.full_name}</strong> was admitted and issued card number{' '}
               <span className="font-mono font-semibold">{newCardFor.barcode}</span>.
             </p>
-            <div ref={newCardPrintRef} className="print-area card-sheet">
+            <div ref={newCardPrintRef} className="print-area no-watermark card-sheet">
               <StudentCard
                 photoUrl={photoUrls.get(newCardFor.id)}
                 student={newCardFor}

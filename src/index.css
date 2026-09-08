@@ -104,6 +104,44 @@
     width: 100%;
   }
 
+  /* The crest behind everything the school prints — challans, receipts, exam
+     papers, registers, reports. One rule rather than a change per document,
+     because `.print-area` is already the single wrapper each of them prints
+     through.
+
+     Attached to a ::before rather than the element's own background so a
+     document that paints its own background (the ID cards do) does not
+     overwrite it, and pinned with `fixed` so it lands once per sheet instead
+     of scrolling off a multi-page print. Very faint: a watermark that
+     competes with the text makes the text harder to read, and these are
+     documents a parent has to be able to read.
+
+     .no-watermark opts a document out — the ID cards are 90x55mm, too small
+     for a crest behind them to be anything but noise. */
+  .print-area::before {
+    content: '';
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    width: 120mm;
+    height: 120mm;
+    transform: translate(-50%, -50%);
+    background: url('./assets/maktab_logo_transparent.png') center / contain no-repeat;
+    opacity: 0.05;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .print-area.no-watermark::before {
+    content: none;
+  }
+
+  /* Keeps the document's own content above the crest. */
+  .print-area > * {
+    position: relative;
+    z-index: 1;
+  }
+
   /* A print-area inside a Modal has that modal's own `position: fixed; inset:
      0` overlay as an ancestor. Nesting one fixed-position box inside another
      is exactly the case Chromium's print engine mispaginates — it can emit
