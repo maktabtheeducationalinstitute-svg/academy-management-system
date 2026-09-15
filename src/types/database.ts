@@ -71,6 +71,8 @@ export interface Student {
    * expire, so a stored one would rot. Null until a photo is uploaded.
    */
   photo_path: string | null
+  /** Free-text academic session/year (e.g. "2025-2026"), printed on the ID card. */
+  session: string | null
   enrollment_status: EnrollmentStatus
   fee_override: number | null
   admission_fee_amount: number
@@ -119,6 +121,12 @@ export interface AttendanceSettings {
   default_start_time: string
   grace_minutes: number
   very_late_minutes: number
+}
+
+export interface InstituteSettings {
+  id: number
+  /** Path within the private institute-assets bucket. Null until uploaded. */
+  principal_signature_path: string | null
 }
 
 export type QuestionType = 'mcq' | 'short' | 'long' | 'fill_blank' | 'true_false'
@@ -348,6 +356,7 @@ export interface Database {
         Insert: InsertOf<
           Student,
           | 'photo_path'
+          | 'session'
           | 'id'
           | 'barcode'
           | 'class_id'
@@ -401,6 +410,12 @@ export interface Database {
           | 'very_late_minutes'
         >
         Update: Partial<AttendanceSettings>
+        Relationships: []
+      }
+      institute_settings: {
+        Row: InstituteSettings
+        Insert: InsertOf<InstituteSettings, 'id' | 'principal_signature_path'>
+        Update: Partial<InstituteSettings>
         Relationships: []
       }
       questions: {

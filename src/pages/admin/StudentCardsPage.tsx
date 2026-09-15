@@ -7,8 +7,9 @@ import { Modal } from '@/components/ui/Modal'
 import { Input, Select } from '@/components/ui/Input'
 import { EmptyState } from '@/components/EmptyState'
 import { StudentCard, StudentCardBack } from '@/components/StudentCard'
+import { signSignatureUrl } from '@/lib/instituteAssets'
 import { printElement } from '@/lib/printElement'
-import type { Class, Student } from '@/types/database'
+import type { Class, InstituteSettings, Student } from '@/types/database'
 
 // Each row holds one student's front + back, printed side by side so cutting
 // the sheet gives you a matched pair ready to glue or laminate back-to-back,
@@ -30,6 +31,7 @@ export function StudentCardsPage() {
   const { show } = useToast()
   const [students, setStudents] = useState<Student[]>([])
   const [photoUrls, setPhotoUrls] = useState<Map<string, string>>(new Map())
+  const [signatureUrl, setSignatureUrl] = useState<string | undefined>(undefined)
   const [classes, setClasses] = useState<Class[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -61,6 +63,17 @@ export function StudentCardsPage() {
     }
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    async function loadSignature() {
+      const { data } = await supabase.from('institute_settings').select('*').eq('id', 1).single()
+      const row = data as InstituteSettings | null
+      if (row?.principal_signature_path) {
+        setSignatureUrl((await signSignatureUrl(row.principal_signature_path)) ?? undefined)
+      }
+    }
+    loadSignature()
   }, [])
 
   const classById = useMemo(() => new Map(classes.map((c) => [c.id, c])), [classes])
@@ -126,6 +139,7 @@ export function StudentCardsPage() {
                 student={s}
                 cls={s.class_id ? classById.get(s.class_id) : undefined}
                 photoUrl={photoUrls.get(s.id)}
+                signatureUrl={signatureUrl}
               />
               <div className="flex flex-col items-center gap-2">
                 <StudentCardBack student={s} />
@@ -150,6 +164,7 @@ export function StudentCardsPage() {
                   student={printOne}
                   cls={printOne.class_id ? classById.get(printOne.class_id) : undefined}
                   photoUrl={photoUrls.get(printOne.id)}
+                  signatureUrl={signatureUrl}
                 />
                 <StudentCardBack student={printOne} />
               </div>

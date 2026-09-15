@@ -9,11 +9,12 @@ import { StudentFullReport } from '@/components/StudentFullReport'
 import { StudentImport } from '@/components/StudentImport'
 import { StudentPhotoField } from '@/components/StudentPhotoField'
 import { deletePhoto, signStudentPhotos, uploadPhoto } from '@/lib/studentPhotos'
-import { StudentCard } from '@/components/StudentCard'
+import { StudentCard, StudentCardBack } from '@/components/StudentCard'
+import { signSignatureUrl } from '@/lib/instituteAssets'
 import { printElement } from '@/lib/printElement'
 import { formatCurrency, isValidEmail, isValidPhone } from '@/lib/utils'
 import { friendlyError } from '@/lib/errors'
-import type { Class, EnrollmentStatus, Student } from '@/types/database'
+import type { Class, EnrollmentStatus, InstituteSettings, Student } from '@/types/database'
 
 type StudentForm = {
   full_name: string
@@ -23,6 +24,7 @@ type StudentForm = {
   guardian_phone: string
   guardian_email: string
   enrollment_status: EnrollmentStatus
+  session: string
   fee_override: string
   admission_fee_amount: string
   admission_fee_paid: boolean
@@ -38,6 +40,7 @@ const emptyForm: StudentForm = {
   guardian_phone: '',
   guardian_email: '',
   enrollment_status: 'enrolled',
+  session: '',
   fee_override: '',
   admission_fee_amount: '0',
   admission_fee_paid: false,
@@ -67,6 +70,7 @@ export function StudentsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Student | null>(null)
   const [reportCardFor, setReportCardFor] = useState<Student | null>(null)
   const [newCardFor, setNewCardFor] = useState<Student | null>(null)
+  const [signatureUrl, setSignatureUrl] = useState<string | undefined>(undefined)
   const reportCardPrintRef = useRef<HTMLDivElement>(null)
   const newCardPrintRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
@@ -91,6 +95,17 @@ export function StudentsPage() {
   useEffect(() => {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    async function loadSignature() {
+      const { data } = await supabase.from('institute_settings').select('*').eq('id', 1).single()
+      const row = data as InstituteSettings | null
+      if (row?.principal_signature_path) {
+        setSignatureUrl((await signSignatureUrl(row.principal_signature_path)) ?? undefined)
+      }
+    }
+    loadSignature()
   }, [])
 
   const activeStudentCount = useMemo(() => students.filter((s) => s.enrollment_status !== 'left').length, [students])
@@ -135,6 +150,7 @@ export function StudentsPage() {
       guardian_phone: s.guardian_phone ?? '',
       guardian_email: s.guardian_email ?? '',
       enrollment_status: s.enrollment_status,
+      session: s.session ?? '',
       fee_override: s.fee_override !== null ? String(s.fee_override) : '',
       admission_fee_amount: String(s.admission_fee_amount),
       admission_fee_paid: s.admission_fee_paid,
@@ -195,6 +211,7 @@ export function StudentsPage() {
       guardian_phone: form.guardian_phone.trim() || null,
       guardian_email: form.guardian_email.trim() || null,
       enrollment_status: form.enrollment_status,
+      session: form.session.trim() || null,
       fee_override: feeOverride,
       admission_fee_amount: admissionFeeAmount,
       admission_fee_paid: form.admission_fee_paid,
@@ -502,6 +519,13 @@ export function StudentsPage() {
                 <option value="left">Left</option>
               </Select>
             </Field>
+            <Field label="Session (academic year, e.g. 2025-2026) — printed on the ID card">
+              <Input
+                placeholder="2025-2026"
+                value={form.session}
+                onChange={(e) => setForm({ ...form, session: e.target.value })}
+              />
+            </Field>
             <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
                 Admission Charges
@@ -582,11 +606,15 @@ export function StudentsPage() {
               <span className="font-mono font-semibold">{newCardFor.barcode}</span>.
             </p>
             <div ref={newCardPrintRef} className="print-area no-watermark card-sheet">
-              <StudentCard
-                photoUrl={photoUrls.get(newCardFor.id)}
-                student={newCardFor}
-                cls={newCardFor.class_id ? classById.get(newCardFor.class_id) : undefined}
-              />
+              <div className="card-row flex flex-wrap items-start justify-center gap-4">
+                <StudentCard
+                  photoUrl={photoUrls.get(newCardFor.id)}
+                  signatureUrl={signatureUrl}
+                  student={newCardFor}
+                  cls={newCardFor.class_id ? classById.get(newCardFor.class_id) : undefined}
+                />
+                <StudentCardBack student={newCardFor} />
+              </div>
             </div>
             <div className="no-print flex justify-end gap-2 self-stretch">
               <Button variant="secondary" onClick={() => setNewCardFor(null)}>
