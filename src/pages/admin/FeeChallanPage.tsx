@@ -10,6 +10,89 @@ import { currentMonthValue, effectiveFee, formatCurrency, formatDate, formatMont
 import { friendlyError } from '@/lib/errors'
 import type { Class, Invoice, Student } from '@/types/database'
 
+// A university-style fee voucher prints two identical copies on one A4 sheet
+// — a "Bank Copy" the payer hands over at the counter and a "Student Copy"
+// they keep for their own record — rather than a single slip, matching how
+// banks actually process these vouchers. Both copies show the same amounts,
+// so there's one source of truth for what's due; only the label differs.
+function ChallanSlipContent({
+  copyLabel,
+  student,
+  cls,
+  monthLabel,
+  invoice,
+}: {
+  copyLabel: string
+  student: Student
+  cls?: Class
+  monthLabel: string
+  invoice: Invoice
+}) {
+  const totalDue =
+    (invoice.status === 'paid' ? 0 : netInvoiceAmount(invoice)) +
+    (!student.admission_fee_paid ? student.admission_fee_amount : 0) +
+    (!student.security_fee_paid ? student.security_fee_amount : 0)
+
+  return (
+    <div className="relative rounded-lg border border-slate-300 p-4 dark:border-slate-600">
+      <span className="absolute right-4 top-4 rounded border border-slate-300 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-600 dark:text-slate-400">
+        {copyLabel}
+      </span>
+      <DocumentLetterhead subtitle="Fee Challan" />
+      <div className="space-y-1 text-sm">
+        <div className="flex justify-between">
+          <span className="text-slate-500 dark:text-slate-400">Student</span>
+          <span>{student.full_name}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-slate-500 dark:text-slate-400">Class</span>
+          <span>{cls?.name ?? '—'}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-slate-500 dark:text-slate-400">Month</span>
+          <span>{monthLabel}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-slate-500 dark:text-slate-400">Due Date</span>
+          <span>{formatDate(invoice.due_date)}</span>
+        </div>
+        <div className="my-2 border-t border-slate-200 dark:border-slate-700" />
+        <div className="flex justify-between">
+          <span className="text-slate-500 dark:text-slate-400">Monthly Tuition Fee</span>
+          <span className="font-semibold">{formatCurrency(invoice.amount)}</span>
+        </div>
+        {!student.admission_fee_paid && student.admission_fee_amount > 0 && (
+          <div className="flex justify-between">
+            <span className="text-slate-500 dark:text-slate-400">Admission Fee (unpaid)</span>
+            <span className="font-semibold">{formatCurrency(student.admission_fee_amount)}</span>
+          </div>
+        )}
+        {!student.security_fee_paid && student.security_fee_amount > 0 && (
+          <div className="flex justify-between">
+            <span className="text-slate-500 dark:text-slate-400">Security Fee (unpaid)</span>
+            <span className="font-semibold">{formatCurrency(student.security_fee_amount)}</span>
+          </div>
+        )}
+        {invoice.discount > 0 && (
+          <div className="flex justify-between">
+            <span className="text-slate-500 dark:text-slate-400">Discount</span>
+            <span className="font-semibold">-{formatCurrency(invoice.discount)}</span>
+          </div>
+        )}
+        <div className="my-2 border-t border-slate-200 dark:border-slate-700" />
+        <div className="flex justify-between text-base">
+          <span className="font-semibold">Total Due</span>
+          <span className="font-bold">{formatCurrency(totalDue)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-slate-500 dark:text-slate-400">Status</span>
+          <span className="capitalize">{invoice.status}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function FeeChallanPage() {
   const { show } = useToast()
   const [students, setStudents] = useState<Student[]>([])
@@ -541,64 +624,26 @@ export function FeeChallanPage() {
             <p className="py-8 text-center text-sm text-slate-400 dark:text-slate-500">Loading challan...</p>
           ) : (
             <>
-              <div ref={printAreaRef} className="print-area space-y-4">
-                <DocumentLetterhead subtitle="Fee Challan" />
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500 dark:text-slate-400">Student</span>
-                    <span>{challanFor.full_name}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500 dark:text-slate-400">Class</span>
-                    <span>{challanFor.class_id ? classById.get(challanFor.class_id)?.name : '—'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500 dark:text-slate-400">Month</span>
-                    <span>{formatMonth(monthValueToDate(challanMonth))}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500 dark:text-slate-400">Due Date</span>
-                    <span>{formatDate(challanInvoice.due_date)}</span>
-                  </div>
-                  <div className="my-2 border-t border-slate-200 dark:border-slate-700" />
-                  <div className="flex justify-between">
-                    <span className="text-slate-500 dark:text-slate-400">Monthly Tuition Fee</span>
-                    <span className="font-semibold">{formatCurrency(challanInvoice.amount)}</span>
-                  </div>
-                  {!challanFor.admission_fee_paid && challanFor.admission_fee_amount > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-500 dark:text-slate-400">Admission Fee (unpaid)</span>
-                      <span className="font-semibold">{formatCurrency(challanFor.admission_fee_amount)}</span>
-                    </div>
-                  )}
-                  {!challanFor.security_fee_paid && challanFor.security_fee_amount > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-500 dark:text-slate-400">Security Fee (unpaid)</span>
-                      <span className="font-semibold">{formatCurrency(challanFor.security_fee_amount)}</span>
-                    </div>
-                  )}
-                  {challanInvoice.discount > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-500 dark:text-slate-400">Discount</span>
-                      <span className="font-semibold">-{formatCurrency(challanInvoice.discount)}</span>
-                    </div>
-                  )}
-                  <div className="my-2 border-t border-slate-200 dark:border-slate-700" />
-                  <div className="flex justify-between text-base">
-                    <span className="font-semibold">Total Due</span>
-                    <span className="font-bold">
-                      {formatCurrency(
-                        (challanInvoice.status === 'paid' ? 0 : netInvoiceAmount(challanInvoice)) +
-                          (!challanFor.admission_fee_paid ? challanFor.admission_fee_amount : 0) +
-                          (!challanFor.security_fee_paid ? challanFor.security_fee_amount : 0)
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500 dark:text-slate-400">Status</span>
-                    <span className="capitalize">{challanInvoice.status}</span>
-                  </div>
+              <div ref={printAreaRef} className="print-area space-y-3">
+                <ChallanSlipContent
+                  copyLabel="Bank Copy"
+                  student={challanFor}
+                  cls={challanFor.class_id ? classById.get(challanFor.class_id) : undefined}
+                  monthLabel={formatMonth(monthValueToDate(challanMonth))}
+                  invoice={challanInvoice}
+                />
+                <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500">
+                  <div className="flex-1 border-t border-dashed border-slate-300 dark:border-slate-600" />
+                  <span className="text-[10px] uppercase tracking-widest">✂ Cut here</span>
+                  <div className="flex-1 border-t border-dashed border-slate-300 dark:border-slate-600" />
                 </div>
+                <ChallanSlipContent
+                  copyLabel="Student Copy"
+                  student={challanFor}
+                  cls={challanFor.class_id ? classById.get(challanFor.class_id) : undefined}
+                  monthLabel={formatMonth(monthValueToDate(challanMonth))}
+                  invoice={challanInvoice}
+                />
               </div>
               <div className="no-print mt-6 flex justify-end gap-2">
                 <Button variant="secondary" onClick={() => setChallanFor(null)}>
