@@ -3,10 +3,14 @@ import { supabase } from '@/lib/supabase'
 import { useToast } from '@/context/ToastContext'
 import { Button } from '@/components/ui/Button'
 import { Field, Select } from '@/components/ui/Input'
-import { currentMonthValue, formatDateTime, formatMonth, monthValueToDate, shiftMonthValue } from '@/lib/utils'
+import { Modal } from '@/components/ui/Modal'
+import { currentMonthValue, formatDate, formatDateTime, formatMonth, monthValueToDate, shiftMonthValue } from '@/lib/utils'
 import { edgeFunctionError } from '@/lib/errors'
 import { buildMonthlyReportPdfBase64 } from '@/lib/pdf'
 import type { Attendance, Class, Exam, ExamResult, MonthlyReport, Student, Subject } from '@/types/database'
+
+type AttendanceRow = { date: string; status: string }
+type ExamRow = { examName: string; subjectName: string; obtained: number; total: number }
 
 export function MonthlyReportsPage() {
   const { show } = useToast()
@@ -20,9 +24,14 @@ export function MonthlyReportsPage() {
   const [loading, setLoading] = useState(true)
   const [monthValue, setMonthValue] = useState(currentMonthValue())
   const [classFilter, setClassFilter] = useState('all')
-  const [sendingId, setSendingId] = useState<string | null>(null)
   const [sendingAll, setSendingAll] = useState(false)
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null)
+
+  const [previewFor, setPreviewFor] = useState<Student | null>(null)
+  const [previewAttendance, setPreviewAttendance] = useState<(AttendanceRow & { included: boolean })[]>([])
+  const [previewExams, setPreviewExams] = useState<(ExamRow & { included: boolean })[]>([])
+  const [remarksDraft, setRemarksDraft] = useState('')
+  const [previewSending, setPreviewSending] = useState(false)
 
   const monthStart = monthValueToDate(monthValue)
   const monthEnd = monthValueToDate(shiftMonthValue(monthValue, 1))
@@ -98,43 +107,53 @@ export function MonthlyReportsPage() {
   const filtered = classFilter === 'all' ? students : students.filter((s) => s.class_id === classFilter)
   const eligible = filtered.filter((s) => s.guardian_email)
 
-  // Builds and sends one student's report, without touching any loading
-  // state or reloading data — both the per-row button and "Send to All"
-  // call this and handle those themselves, so the bulk path can send one
-  // at a time (see below) instead of duplicating this logic.
-  async function sendReportTo(student: Student): Promise<{ ok: boolean; error?: string }> {
+  function studentAttendanceRows(student: Student): AttendanceRow[] {
+    return attendance.filter((a) => a.student_id === student.id).map((a) => ({ date: a.date, status: a.status }))
+  }
+
+  function studentExamRows(student: Student): ExamRow[] {
+    return exams
+      .filter((e) => e.class_id === student.class_id)
+      .map((e) => {
+        const result = resultByExamAndStudent.get(`${e.id}|${student.id}`)
+        if (!result) return null
+        return {
+          examName: e.name,
+          subjectName: subjectById.get(e.subject_id)?.name ?? '—',
+          obtained: result.marks_obtained,
+          total: e.total_marks,
+        }
+      })
+      .filter((e): e is NonNullable<typeof e> => e !== null)
+  }
+
+  // Builds and sends one student's report from whatever attendance/exam rows
+  // and remarks are passed in — not read fresh from state — so the preview
+  // modal can send exactly what the admin reviewed (with rows unchecked and
+  // a note added) while "Send to All" can still send the plain, un-edited
+  // report without going through the modal for every student.
+  async function sendBuiltReport(
+    student: Student,
+    attendanceRows: AttendanceRow[],
+    examRows: ExamRow[],
+    remarks: string
+  ): Promise<{ ok: boolean; error?: string }> {
     if (!student.guardian_email) {
       return { ok: false, error: 'No guardian email on file for this student.' }
     }
     try {
       const className = student.class_id ? classById.get(student.class_id)?.name ?? '' : ''
-      const studentAttendance = attendance
-        .filter((a) => a.student_id === student.id)
-        .map((a) => ({ date: a.date, status: a.status }))
-      const studentExams = exams
-        .filter((e) => e.class_id === student.class_id)
-        .map((e) => {
-          const result = resultByExamAndStudent.get(`${e.id}|${student.id}`)
-          if (!result) return null
-          return {
-            examName: e.name,
-            subjectName: subjectById.get(e.subject_id)?.name ?? '—',
-            obtained: result.marks_obtained,
-            total: e.total_marks,
-          }
-        })
-        .filter((e): e is NonNullable<typeof e> => e !== null)
-
       const pdfBase64 = await buildMonthlyReportPdfBase64({
         studentName: student.full_name,
         className,
         monthLabel: formatMonth(monthStart),
-        attendance: studentAttendance,
-        exams: studentExams,
+        attendance: attendanceRows,
+        exams: examRows,
+        remarks: remarks.trim() || undefined,
       })
 
       const { data, error } = await supabase.functions.invoke('send-monthly-report', {
-        body: { studentId: student.id, month: monthStart, pdfBase64 },
+        body: { studentId: student.id, month: monthStart, pdfBase64, remarks: remarks.trim() || null },
       })
       if (error) {
         return { ok: false, error: await edgeFunctionError(error, 'Failed to send report.') }
@@ -149,15 +168,32 @@ export function MonthlyReportsPage() {
     }
   }
 
-  async function sendTestReport(student: Student) {
-    setSendingId(student.id)
-    const result = await sendReportTo(student)
-    setSendingId(null)
+  // Opens the review step instead of sending straight away — the client
+  // asked for a chance to see exactly what's going out (and drop a day/exam
+  // row, or add a note) before a guardian's inbox gets it.
+  function openPreview(student: Student) {
+    setPreviewFor(student)
+    setPreviewAttendance(studentAttendanceRows(student).map((row) => ({ ...row, included: true })))
+    setPreviewExams(studentExamRows(student).map((row) => ({ ...row, included: true })))
+    setRemarksDraft(reportByStudent.get(student.id)?.remarks ?? '')
+  }
+
+  async function sendPreview() {
+    if (!previewFor) return
+    setPreviewSending(true)
+    const result = await sendBuiltReport(
+      previewFor,
+      previewAttendance.filter((a) => a.included).map(({ date, status }) => ({ date, status })),
+      previewExams.filter((e) => e.included).map(({ examName, subjectName, obtained, total }) => ({ examName, subjectName, obtained, total })),
+      remarksDraft
+    )
+    setPreviewSending(false)
     if (!result.ok) {
       show(result.error ?? 'Failed to send report.', 'error')
       return
     }
-    show(`Report emailed to ${student.guardian_email}, with PDF attached.`)
+    show(`Report emailed to ${previewFor.guardian_email}, with PDF attached.`)
+    setPreviewFor(null)
     load()
   }
 
@@ -176,7 +212,7 @@ export function MonthlyReportsPage() {
     for (let i = 0; i < eligible.length; i++) {
       setBulkProgress({ done: i, total: eligible.length })
       const student = eligible[i]
-      const result = await sendReportTo(student)
+      const result = await sendBuiltReport(student, studentAttendanceRows(student), studentExamRows(student), '')
       if (result.ok) sent++
       else failures.push(`${student.full_name}: ${result.error ?? 'failed'}`)
     }
@@ -201,7 +237,7 @@ export function MonthlyReportsPage() {
           </p>
         </div>
         <div className="flex flex-col items-end gap-1">
-          <Button onClick={sendAllReports} disabled={sendingAll || sendingId !== null || eligible.length === 0}>
+          <Button onClick={sendAllReports} disabled={sendingAll || previewFor !== null || eligible.length === 0}>
             {sendingAll
               ? `Sending... (${bulkProgress ? bulkProgress.done + 1 : 0}/${bulkProgress?.total ?? eligible.length})`
               : `Send to All (${eligible.length})`}
@@ -293,11 +329,11 @@ export function MonthlyReportsPage() {
                     <td className="px-4 py-3 text-right">
                       {s.guardian_email ? (
                         <button
-                          onClick={() => sendTestReport(s)}
-                          disabled={sendingId === s.id || sendingAll}
+                          onClick={() => openPreview(s)}
+                          disabled={sendingAll}
                           className="text-sm text-brand-600 hover:underline disabled:opacity-50 dark:text-gold-400"
                         >
-                          {sendingId === s.id ? 'Sending...' : 'Send Test Report'}
+                          Preview & Send
                         </button>
                       ) : (
                         <span className="text-xs text-slate-400 dark:text-slate-500" title="No guardian email on file">
@@ -312,6 +348,116 @@ export function MonthlyReportsPage() {
           </tbody>
         </table>
       </div>
+
+      {previewFor && (
+        <Modal title={`Preview Report — ${previewFor.full_name}`} onClose={() => setPreviewFor(null)} wide>
+          <div className="space-y-4">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              {formatMonth(monthStart)} ·{' '}
+              {previewFor.class_id ? classById.get(previewFor.class_id)?.name ?? '—' : '—'} — uncheck anything that
+              shouldn't go in this report, add a note if you'd like, then send.
+            </p>
+
+            <div>
+              <p className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                Attendance ({previewAttendance.filter((a) => a.included).length} of {previewAttendance.length} days
+                included)
+              </p>
+              {previewAttendance.length === 0 ? (
+                <p className="text-sm text-slate-400 dark:text-slate-500">No attendance was recorded this month.</p>
+              ) : (
+                <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                  <table className="w-full text-left text-sm">
+                    <tbody>
+                      {previewAttendance.map((row, i) => (
+                        <tr
+                          key={row.date}
+                          className="border-b border-slate-100 last:border-0 dark:border-slate-700/60"
+                        >
+                          <td className="px-3 py-1.5">
+                            <label className="flex items-center gap-2 text-slate-700 dark:text-slate-200">
+                              <input
+                                type="checkbox"
+                                checked={row.included}
+                                onChange={(e) =>
+                                  setPreviewAttendance((prev) =>
+                                    prev.map((r, idx) => (idx === i ? { ...r, included: e.target.checked } : r))
+                                  )
+                                }
+                              />
+                              {formatDate(row.date)}
+                            </label>
+                          </td>
+                          <td className="px-3 py-1.5 capitalize text-slate-600 dark:text-slate-300">{row.status}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <p className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                Exams ({previewExams.filter((e) => e.included).length} of {previewExams.length} included)
+              </p>
+              {previewExams.length === 0 ? (
+                <p className="text-sm text-slate-400 dark:text-slate-500">No exam results this month.</p>
+              ) : (
+                <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
+                  <table className="w-full text-left text-sm">
+                    <tbody>
+                      {previewExams.map((row, i) => (
+                        <tr
+                          key={`${row.examName}-${row.subjectName}-${i}`}
+                          className="border-b border-slate-100 last:border-0 dark:border-slate-700/60"
+                        >
+                          <td className="px-3 py-1.5">
+                            <label className="flex items-center gap-2 text-slate-700 dark:text-slate-200">
+                              <input
+                                type="checkbox"
+                                checked={row.included}
+                                onChange={(e) =>
+                                  setPreviewExams((prev) =>
+                                    prev.map((r, idx) => (idx === i ? { ...r, included: e.target.checked } : r))
+                                  )
+                                }
+                              />
+                              {row.examName} — {row.subjectName}
+                            </label>
+                          </td>
+                          <td className="px-3 py-1.5 text-slate-600 dark:text-slate-300">
+                            {row.obtained} / {row.total}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <Field label="Remarks (optional — shown in the email and printed on the PDF)">
+              <textarea
+                rows={3}
+                value={remarksDraft}
+                onChange={(e) => setRemarksDraft(e.target.value)}
+                placeholder="e.g. Needs to improve attendance in the last week of the month."
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900"
+              />
+            </Field>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setPreviewFor(null)}>
+                Cancel
+              </Button>
+              <Button onClick={sendPreview} disabled={previewSending}>
+                {previewSending ? 'Sending...' : 'Send Report'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

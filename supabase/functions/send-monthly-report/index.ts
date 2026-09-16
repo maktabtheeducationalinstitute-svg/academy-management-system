@@ -87,6 +87,7 @@ Deno.serve(async (req) => {
   const studentId = body?.studentId
   const month = body?.month // 'YYYY-MM-01'
   const pdfBase64 = body?.pdfBase64
+  const remarks = typeof body?.remarks === 'string' && body.remarks.trim() ? body.remarks.trim() : null
   if (!studentId || !month) {
     return jsonResponse({ error: 'studentId and month are required' }, 400)
   }
@@ -125,6 +126,14 @@ Deno.serve(async (req) => {
           Please find attached <strong>${student.full_name}</strong>'s${klass?.name ? ` (${klass.name})` : ''} attendance
           and exam report for <strong>${monthLabel}</strong>.
         </p>
+        ${
+          remarks
+            ? `<div style="margin: 16px 0; padding: 12px 14px; background: #fdfbf5; border-left: 3px solid #dfb65b;">
+                 <p style="margin: 0 0 4px; font-weight: 600; color: #7a1f2e; font-size: 13px;">Remarks</p>
+                 <p style="margin: 0; white-space: pre-wrap;">${remarks.replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c] as string))}</p>
+               </div>`
+            : ''
+        }
         <p>If you have any questions about this report, please reach out to the school office.</p>
         <p style="margin-top: 28px; margin-bottom: 0;">Thank you,</p>
         <p style="margin-top: 2px; font-weight: 600; color: #7a1f2e;">Maktab - The Educational Institute</p>
@@ -163,7 +172,7 @@ Deno.serve(async (req) => {
 
   await adminClient
     .from('monthly_reports')
-    .upsert({ student_id: studentId, month, sent_at: new Date().toISOString() }, { onConflict: 'student_id,month' })
+    .upsert({ student_id: studentId, month, sent_at: new Date().toISOString(), remarks }, { onConflict: 'student_id,month' })
 
   return jsonResponse({ success: true, to: student.guardian_email })
 })

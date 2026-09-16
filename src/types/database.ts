@@ -284,6 +284,7 @@ export interface MonthlyReport {
   student_id: string
   month: string
   sent_at: string | null
+  remarks: string | null
   created_at: string
 }
 

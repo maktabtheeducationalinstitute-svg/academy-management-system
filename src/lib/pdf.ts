@@ -77,8 +77,9 @@ export async function buildMonthlyReportPdfBase64(params: {
   monthLabel: string
   attendance: { date: string; status: string }[]
   exams: { examName: string; subjectName: string; obtained: number; total: number }[]
+  remarks?: string
 }): Promise<string> {
-  const { studentName, className, monthLabel, attendance, exams } = params
+  const { studentName, className, monthLabel, attendance, exams, remarks } = params
   const [{ default: jsPDF }, { default: autoTable }, { MAKTAB_LOGO_BASE64 }] = await Promise.all([
     import('jspdf'),
     import('jspdf-autotable'),
@@ -174,6 +175,25 @@ export async function buildMonthlyReportPdfBase64(params: {
       headStyles: { fillColor: [122, 31, 46] },
       styles: { fontSize: 10 },
     })
+  }
+
+  // A short personal note the admin wrote while reviewing this specific
+  // report before sending it — not tied to any attendance/exam record, so it
+  // always goes at the very end, after whatever tables came before it.
+  if (remarks && remarks.trim()) {
+    const lastTableY = (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? cursorY
+    let remarksY = lastTableY + 14
+    if (remarksY > 270) {
+      doc.addPage()
+      remarksY = 20
+    }
+    doc.setFontSize(11)
+    doc.setTextColor(122, 31, 46)
+    doc.text('Remarks', 14, remarksY)
+    doc.setTextColor(0)
+    doc.setFontSize(10)
+    const lines = doc.splitTextToSize(remarks.trim(), 182)
+    doc.text(lines, 14, remarksY + 7)
   }
 
   const dataUri = doc.output('datauristring')
