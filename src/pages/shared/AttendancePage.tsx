@@ -225,7 +225,7 @@ export function AttendancePage() {
           <p className="text-sm text-slate-500 dark:text-slate-400">
             {entity === 'students'
               ? isAdmin
-                ? 'Review student attendance and defaulters — teachers mark daily attendance.'
+                ? "Review any class's daily record and defaulters — teachers mark the actual attendance."
                 : 'Mark daily attendance and review defaulters.'
               : "Mark and review teachers' attendance."}
           </p>
@@ -249,14 +249,12 @@ export function AttendancePage() {
           )}
           {entity === 'students' && (
             <div className="flex gap-2 rounded-lg border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-800">
-              {!isAdmin && (
-                <button
-                  onClick={() => setTab('mark')}
-                  className={`rounded-md px-3 py-1.5 text-sm font-medium ${tab === 'mark' ? 'bg-brand-600 text-white' : 'text-slate-600 dark:text-slate-300'}`}
-                >
-                  Mark Attendance
-                </button>
-              )}
+              <button
+                onClick={() => setTab('mark')}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium ${tab === 'mark' ? 'bg-brand-600 text-white' : 'text-slate-600 dark:text-slate-300'}`}
+              >
+                {isAdmin ? 'Daily Record' : 'Mark Attendance'}
+              </button>
               <button
                 onClick={() => setTab('history')}
                 className={`rounded-md px-3 py-1.5 text-sm font-medium ${tab === 'history' ? 'bg-brand-600 text-white' : 'text-slate-600 dark:text-slate-300'}`}
@@ -297,14 +295,16 @@ export function AttendancePage() {
                 className="rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm"
               />
             </div>
-            <div className="flex gap-2">
-              <Button variant="secondary" onClick={() => markAll('present')}>
-                Mark all present
-              </Button>
-              <Button variant="secondary" onClick={() => markAll('absent')}>
-                Mark all absent
-              </Button>
-            </div>
+            {!isAdmin && (
+              <div className="flex gap-2">
+                <Button variant="secondary" onClick={() => markAll('present')}>
+                  Mark all present
+                </Button>
+                <Button variant="secondary" onClick={() => markAll('absent')}>
+                  Mark all absent
+                </Button>
+              </div>
+            )}
           </div>
 
           <div className="print-area overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
@@ -343,13 +343,17 @@ export function AttendancePage() {
                       </td>
                       {(['present', 'absent', 'late'] as AttendanceStatus[]).map((status) => (
                         <td key={status} className="px-4 py-3">
-                          <input
-                            type="radio"
-                            name={`status-${s.id}`}
-                            checked={marks[s.id] === status}
-                            onChange={() => setMarks({ ...marks, [s.id]: status })}
-                            className="no-print h-4 w-4"
-                          />
+                          {isAdmin ? (
+                            <span className="no-print text-sm">{marks[s.id] === status ? '✓' : ''}</span>
+                          ) : (
+                            <input
+                              type="radio"
+                              name={`status-${s.id}`}
+                              checked={marks[s.id] === status}
+                              onChange={() => setMarks({ ...marks, [s.id]: status })}
+                              className="no-print h-4 w-4"
+                            />
+                          )}
                           <span className="hidden print:inline">{marks[s.id] === status ? '✓' : ''}</span>
                         </td>
                       ))}
@@ -367,9 +371,11 @@ export function AttendancePage() {
             <Button variant="secondary" onClick={() => window.print()}>
               Print
             </Button>
-            <Button onClick={handleSave} disabled={saving || students.length === 0}>
-              {saving ? 'Saving...' : 'Save Attendance'}
-            </Button>
+            {!isAdmin && (
+              <Button onClick={handleSave} disabled={saving || students.length === 0}>
+                {saving ? 'Saving...' : 'Save Attendance'}
+              </Button>
+            )}
           </div>
         </div>
       ) : (

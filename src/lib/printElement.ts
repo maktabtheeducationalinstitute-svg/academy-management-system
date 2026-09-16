@@ -5,7 +5,7 @@
 // Printing from a throwaway iframe containing only the target element (and a
 // clone of the app's stylesheets) sidesteps that entirely: there's nothing
 // else in that document to mispaginate around.
-export function printElement(element: HTMLElement | null) {
+export function printElement(element: HTMLElement | null, options?: { landscape?: boolean }) {
   if (!element) return
 
   const iframe = document.createElement('iframe')
@@ -33,7 +33,11 @@ export function printElement(element: HTMLElement | null) {
   // off rather than flowing onto page 2+). Overriding back to normal flow
   // for this isolated document fixes that without touching the shared
   // stylesheet other in-place print flows still rely on.
-  const overrideStyle = `<style>@media print { body { height: auto !important; overflow: visible !important; } .print-area { position: static !important; left: auto !important; top: auto !important; width: auto !important; } }</style>`
+  // Landscape is opt-in per call (e.g. a side-by-side fee voucher needs the
+  // width) rather than a global rule, since most print jobs — cards, exam
+  // papers, the timetable — are portrait and share this same stylesheet.
+  const landscapeRule = options?.landscape ? '@page { size: landscape; }' : ''
+  const overrideStyle = `<style>${landscapeRule}@media print { body { height: auto !important; overflow: visible !important; } .print-area { position: static !important; left: auto !important; top: auto !important; width: auto !important; } }</style>`
 
   doc.open()
   doc.write(`<!DOCTYPE html><html><head>${headHtml}${overrideStyle}</head><body>${element.outerHTML}</body></html>`)

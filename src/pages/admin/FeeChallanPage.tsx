@@ -353,7 +353,7 @@ export function FeeChallanPage() {
     if (challanInvoice && dueDateDraft !== (challanInvoice.due_date ?? '')) {
       await saveDueDate()
     }
-    printElement(printAreaRef.current)
+    printElement(printAreaRef.current, { landscape: true })
   }
 
   async function markChallanPaid() {
@@ -574,7 +574,7 @@ export function FeeChallanPage() {
       </div>
 
       {challanFor && (
-        <Modal title="Fee Challan" onClose={() => setChallanFor(null)}>
+        <Modal title="Fee Challan" onClose={() => setChallanFor(null)} size="xl">
           {challanError ? (
             <div className="space-y-4">
               <p className="text-sm text-red-600 dark:text-red-400">{challanError}</p>
@@ -624,26 +624,30 @@ export function FeeChallanPage() {
             <p className="py-8 text-center text-sm text-slate-400 dark:text-slate-500">Loading challan...</p>
           ) : (
             <>
-              <div ref={printAreaRef} className="print-area space-y-3">
-                <ChallanSlipContent
-                  copyLabel="Bank Copy"
-                  student={challanFor}
-                  cls={challanFor.class_id ? classById.get(challanFor.class_id) : undefined}
-                  monthLabel={formatMonth(monthValueToDate(challanMonth))}
-                  invoice={challanInvoice}
-                />
-                <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500">
-                  <div className="flex-1 border-t border-dashed border-slate-300 dark:border-slate-600" />
-                  <span className="text-[10px] uppercase tracking-widest">✂ Cut here</span>
-                  <div className="flex-1 border-t border-dashed border-slate-300 dark:border-slate-600" />
+              <div ref={printAreaRef} className="print-area flex items-stretch gap-3">
+                <div className="min-w-0 flex-1">
+                  <ChallanSlipContent
+                    copyLabel="Bank Copy"
+                    student={challanFor}
+                    cls={challanFor.class_id ? classById.get(challanFor.class_id) : undefined}
+                    monthLabel={formatMonth(monthValueToDate(challanMonth))}
+                    invoice={challanInvoice}
+                  />
                 </div>
-                <ChallanSlipContent
-                  copyLabel="Student Copy"
-                  student={challanFor}
-                  cls={challanFor.class_id ? classById.get(challanFor.class_id) : undefined}
-                  monthLabel={formatMonth(monthValueToDate(challanMonth))}
-                  invoice={challanInvoice}
-                />
+                <div className="flex shrink-0 flex-col items-center gap-1">
+                  <div className="w-0 flex-1 border-l border-dashed border-slate-300 dark:border-slate-600" />
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500">✂</span>
+                  <div className="w-0 flex-1 border-l border-dashed border-slate-300 dark:border-slate-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <ChallanSlipContent
+                    copyLabel="Student Copy"
+                    student={challanFor}
+                    cls={challanFor.class_id ? classById.get(challanFor.class_id) : undefined}
+                    monthLabel={formatMonth(monthValueToDate(challanMonth))}
+                    invoice={challanInvoice}
+                  />
+                </div>
               </div>
               <div className="no-print mt-6 flex justify-end gap-2">
                 <Button variant="secondary" onClick={() => setChallanFor(null)}>
