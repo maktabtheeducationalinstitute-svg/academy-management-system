@@ -19,6 +19,11 @@ export function SalariesPage() {
   const [generatingSalaries, setGeneratingSalaries] = useState(false)
   const [amountDrafts, setAmountDrafts] = useState<Record<string, string>>({})
   const [historyFor, setHistoryFor] = useState<TeacherRow | null>(null)
+  // A teacher who has left is not on next month's payroll, so the table would
+  // otherwise fill up with people nobody is paying. Their history is still
+  // reachable — the toggle brings them back, and their past salary rows are
+  // untouched either way.
+  const [includeLeft, setIncludeLeft] = useState(false)
 
   const currentMonth = monthValueToDate(currentMonthValue())
 
@@ -56,6 +61,12 @@ export function SalariesPage() {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const visibleTeachers = useMemo(
+    () => (includeLeft ? teachers : teachers.filter((t) => t.status !== 'left')),
+    [teachers, includeLeft]
+  )
+  const leftCount = useMemo(() => teachers.filter((t) => t.status === 'left').length, [teachers])
 
   const monthSalaries = useMemo(() => salaries.filter((s) => s.month === currentMonth), [salaries, currentMonth])
   const salaryByTeacher = useMemo(() => new Map(monthSalaries.map((s) => [s.teacher_id, s])), [monthSalaries])
@@ -181,7 +192,18 @@ export function SalariesPage() {
             </p>
           </div>
         </div>
-        {teachers.length === 0 ? (
+        {leftCount > 0 && (
+          <label className="mb-3 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+            <input
+              type="checkbox"
+              checked={includeLeft}
+              onChange={(e) => setIncludeLeft(e.target.checked)}
+              className="h-4 w-4"
+            />
+            Show teachers who have left ({leftCount})
+          </label>
+        )}
+        {visibleTeachers.length === 0 ? (
           <p className="text-sm text-slate-400 dark:text-slate-500">No teachers yet.</p>
         ) : (
           <div className="overflow-x-auto">
@@ -197,7 +219,7 @@ export function SalariesPage() {
                 </tr>
               </thead>
               <tbody>
-                {teachers.map((t) => {
+                {visibleTeachers.map((t) => {
                   const salary = salaryByTeacher.get(t.id)
                   const lifetime = salaryByTeacherAllTime.get(t.id) ?? { paid: 0, pending: 0 }
                   return (

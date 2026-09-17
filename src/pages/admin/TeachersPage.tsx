@@ -30,6 +30,8 @@ export function TeachersPage() {
   const [editError, setEditError] = useState<string | null>(null)
 
   const [deleteTarget, setDeleteTarget] = useState<TeacherRow | null>(null)
+  /** Null while still counting — the dialog says so rather than claiming zero. */
+  const [deleteCounts, setDeleteCounts] = useState<{ salaries: number; attendance: number } | null>(null)
   const [deleting, setDeleting] = useState(false)
 
   async function load() {
@@ -165,6 +167,20 @@ export function TeachersPage() {
     load()
   }
 
+  // Counted before the dialog opens, so the confirm names what is actually
+  // about to be destroyed rather than describing it in the abstract. An admin
+  // deleting a teacher with two years of payroll should see "24 salary
+  // records" before they click, not afterwards.
+  async function openDelete(teacher: TeacherRow) {
+    setDeleteTarget(teacher)
+    setDeleteCounts(null)
+    const [salaryRes, attendanceRes] = await Promise.all([
+      supabase.from('salaries').select('id', { count: 'exact', head: true }).eq('teacher_id', teacher.id),
+      supabase.from('teacher_attendance').select('id', { count: 'exact', head: true }).eq('teacher_id', teacher.id),
+    ])
+    setDeleteCounts({ salaries: salaryRes.count ?? 0, attendance: attendanceRes.count ?? 0 })
+  }
+
   async function handleDelete() {
     if (!deleteTarget) return
     setDeleting(true)
@@ -271,9 +287,25 @@ export function TeachersPage() {
                     >
                       Edit
                     </button>
-                    <button onClick={() => setDeleteTarget(t)} className="text-sm text-red-600 dark:text-red-400 hover:underline">
-                      Delete
-                    </button>
+                    {/* Deleting destroys payroll and attendance history, so it
+                        is offered only once a teacher has actually left. For
+                        anyone still on the roll, changing the status is the
+                        action that removes them from it. */}
+                    {t.status === 'left' ? (
+                      <button
+                        onClick={() => openDelete(t)}
+                        className="text-sm text-red-600 hover:underline dark:text-red-400"
+                      >
+                        Delete
+                      </button>
+                    ) : (
+                      <span
+                        className="text-sm text-slate-300 dark:text-slate-600"
+                        title="Set this teacher's status to 'left' before deleting — deleting removes their salary and attendance history."
+                      >
+                        Delete
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))
@@ -383,10 +415,20 @@ export function TeachersPage() {
       {deleteTarget && (
         <ConfirmDialog
           title="Delete teacher"
-          message={`Delete ${deleteTarget.full_name}'s account? This removes their login, subject assignments, and timetable slots. This is blocked if they have any salary or attendance records on file — mark them as 'left' instead to preserve that history.`}
-          confirmLabel={deleting ? 'Deleting...' : 'Delete'}
+          message={
+            deleteCounts === null
+              ? `Checking what ${deleteTarget.full_name} has on file...`
+              : `Permanently delete ${deleteTarget.full_name}? This removes their login, subject assignments and timetable slots — and destroys ` +
+                `${deleteCounts.salaries} salary record${deleteCounts.salaries === 1 ? '' : 's'} and ` +
+                `${deleteCounts.attendance} attendance day${deleteCounts.attendance === 1 ? '' : 's'}. ` +
+                `That history cannot be recovered. To remove them from the roll without losing it, leave them marked 'left' instead.`
+          }
+          confirmLabel={deleting ? 'Deleting...' : 'Delete permanently'}
           danger
-          onCancel={() => setDeleteTarget(null)}
+          onCancel={() => {
+            setDeleteTarget(null)
+            setDeleteCounts(null)
+          }}
           onConfirm={handleDelete}
         />
       )}

@@ -48,12 +48,57 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'teacherId is required' }, 400)
   }
 
+  // salaries and teacher_attendance are `on delete restrict` on purpose, so a
+  // teacher with payroll or attendance history cannot be removed by accident.
+  // That is right for somebody still on the roll, but it also meant a teacher
+  // who had genuinely left could never be cleared out — the delete simply
+  // failed and told the admin to mark them 'left', which they already had.
+  //
+  // So the history is only ever destroyed for a teacher already marked 'left',
+  // and only then. The caller is told how many records that is before it
+  // happens (see countTeacherRecords below, used by the confirm dialog), so
+  // "delete this teacher" never quietly means "delete a year of payroll".
+  const { data: teacher } = await adminClient
+    .from('teachers')
+    .select('status')
+    .eq('id', teacherId)
+    .single()
+
+  if (!teacher) {
+    return jsonResponse({ error: 'No such teacher.' }, 404)
+  }
+
+  if (teacher.status !== 'left') {
+    return jsonResponse(
+      {
+        error:
+          'Only a teacher marked "left" can be deleted, because deleting one destroys their salary and attendance history. ' +
+          'Set their status to "left" first — that alone removes them from the active roll and keeps the record.',
+      },
+      400
+    )
+  }
+
+  // Order matters: the dependants block the parent delete, so they go first.
+  const { error: salaryError } = await adminClient.from('salaries').delete().eq('teacher_id', teacherId)
+  if (salaryError) {
+    return jsonResponse({ error: `Could not remove salary records: ${salaryError.message}` }, 400)
+  }
+
+  const { error: attendanceError } = await adminClient
+    .from('teacher_attendance')
+    .delete()
+    .eq('teacher_id', teacherId)
+  if (attendanceError) {
+    return jsonResponse({ error: `Could not remove attendance records: ${attendanceError.message}` }, 400)
+  }
+
   const { error: deleteError } = await adminClient.auth.admin.deleteUser(teacherId)
   if (deleteError) {
-    // salaries/teacher_attendance now block the cascade instead of silently
-    // wiping payroll and attendance history — surface that as guidance.
+    // Anything left blocking the delete is something this function does not
+    // know about, so report it rather than guessing at the cause.
     const message = deleteError.message.includes('foreign key constraint')
-      ? "This teacher has salary or attendance records on file. Mark them as 'left' instead of deleting, so that history is preserved."
+      ? 'This teacher still has records attached that must be dealt with first: ' + deleteError.message
       : deleteError.message
     return jsonResponse({ error: message }, 400)
   }

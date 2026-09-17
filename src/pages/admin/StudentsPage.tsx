@@ -48,6 +48,9 @@ const emptyForm: StudentForm = {
   security_fee_paid: false,
 }
 
+/** One screenful of roll. 500 students on a single page is unusable. */
+const STUDENTS_PER_PAGE = 50
+
 export function StudentsPage() {
   const { show } = useToast()
   const [students, setStudents] = useState<Student[]>([])
@@ -71,6 +74,7 @@ export function StudentsPage() {
   const [reportCardFor, setReportCardFor] = useState<Student | null>(null)
   const [newCardFor, setNewCardFor] = useState<Student | null>(null)
   const [signatureUrl, setSignatureUrl] = useState<string | undefined>(undefined)
+  const [page, setPage] = useState(1)
   const reportCardPrintRef = useRef<HTMLDivElement>(null)
   const newCardPrintRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
@@ -125,6 +129,17 @@ export function StudentsPage() {
     if (statusFilter !== 'all' && s.enrollment_status !== statusFilter) return false
     return true
   })
+
+  // A roll of several hundred students is unusable as one list — and the rows
+  // are not cheap, since each carries a photo. Only a page of them is rendered
+  // at a time.
+  const totalPages = Math.max(1, Math.ceil(filtered.length / STUDENTS_PER_PAGE))
+  // Filtering can shrink the list under the current page (search on page 6,
+  // two matches). Clamping here rather than resetting the page means changing
+  // a filter never lands on a blank table.
+  const currentPage = Math.min(page, totalPages)
+  const pageStart = (currentPage - 1) * STUDENTS_PER_PAGE
+  const visible = filtered.slice(pageStart, pageStart + STUDENTS_PER_PAGE)
 
   function resetPhotoState() {
     setPhotoBlob(null)
@@ -315,7 +330,11 @@ export function StudentsPage() {
           <option value="left">Left</option>
         </Select>
         <span className="ml-auto self-center text-sm text-slate-500 dark:text-slate-400">
-          {filtered.length} of {students.length} students
+          {filtered.length === 0
+            ? `0 of ${students.length} students`
+            : `${pageStart + 1}–${Math.min(pageStart + STUDENTS_PER_PAGE, filtered.length)} of ${filtered.length}${
+                filtered.length === students.length ? '' : ` (${students.length} total)`
+              }`}
         </span>
       </div>
 
@@ -346,7 +365,7 @@ export function StudentsPage() {
                 </td>
               </tr>
             ) : (
-              filtered.map((s) => (
+              visible.map((s) => (
                 <tr
                   key={s.id}
                   onClick={() => setReportCardFor(s)}
@@ -429,6 +448,30 @@ export function StudentsPage() {
           </tbody>
         </table>
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Page {currentPage} of {totalPages}
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
 
       {showImport && (
         <Modal title="Import students from CSV" onClose={() => setShowImport(false)} size="xl">
