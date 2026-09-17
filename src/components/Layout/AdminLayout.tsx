@@ -15,6 +15,7 @@ const navItems: NavItem[] = [
   { label: 'Fees', to: '/admin/fees' },
   { label: 'Fee Challans', to: '/admin/fee-challans' },
   { label: 'Salaries', to: '/admin/salaries' },
+  { label: 'Reports', to: '/admin/reports' },
   { label: 'Monthly Reports', to: '/admin/monthly-reports' },
   { label: 'Course Breakdown', to: '/admin/course-breakdown' },
   { label: 'Settings', to: '/admin/settings' },

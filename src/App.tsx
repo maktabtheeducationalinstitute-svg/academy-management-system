@@ -30,6 +30,11 @@ import { StudentCardsPage } from '@/pages/admin/StudentCardsPage'
 import { ScannerPage } from '@/pages/attendance/ScannerPage'
 import { MonthlyReportsPage } from '@/pages/admin/MonthlyReportsPage'
 import { SettingsPage } from '@/pages/shared/SettingsPage'
+import { ReportsIndexPage } from '@/pages/admin/reports/ReportsIndexPage'
+import { StudentAttendanceReportPage } from '@/pages/admin/reports/StudentAttendanceReportPage'
+import { StudentAttendanceDetailPage } from '@/pages/admin/reports/StudentAttendanceDetailPage'
+import { StudentExamReportPage, StudentExamDetailPage } from '@/pages/admin/reports/StudentExamReportPage'
+import { TeacherAttendanceReportPage, TeacherAttendanceDetailPage } from '@/pages/admin/reports/TeacherAttendanceReportPage'
 
 export default function App() {
   return (
@@ -54,6 +59,13 @@ export default function App() {
                 <Route path="fee-challans" element={<FeeChallanPage />} />
                 <Route path="salaries" element={<SalariesPage />} />
                 <Route path="monthly-reports" element={<MonthlyReportsPage />} />
+                <Route path="reports" element={<ReportsIndexPage />} />
+                <Route path="reports/student-attendance" element={<StudentAttendanceReportPage />} />
+                <Route path="reports/student-attendance/:studentId" element={<StudentAttendanceDetailPage />} />
+                <Route path="reports/student-exams" element={<StudentExamReportPage />} />
+                <Route path="reports/student-exams/:studentId" element={<StudentExamDetailPage />} />
+                <Route path="reports/teacher-attendance" element={<TeacherAttendanceReportPage />} />
+                <Route path="reports/teacher-attendance/:teacherId" element={<TeacherAttendanceDetailPage />} />
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="course-breakdown" element={<CourseBreakdownOverviewPage />} />
               </Route>
