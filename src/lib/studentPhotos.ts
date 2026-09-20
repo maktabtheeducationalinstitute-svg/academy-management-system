@@ -4,20 +4,24 @@ import type { Student } from '@/types/database'
 export const PHOTO_BUCKET = 'student-photos'
 
 /**
- * Printed at roughly 20mm x 25mm on the card, so anything past a few hundred
- * pixels is invisible on paper and only costs storage and load time. Portrait
- * 4:5, the shape a passport-style photo already is.
+ * Printed about 19mm square on the card, so anything past a few hundred pixels
+ * is invisible on paper and only costs storage and load time.
+ *
+ * Square rather than portrait: the card frame is square, so storing a 4:5
+ * image meant the browser cropped it a second time on display, losing more of
+ * the face than one crop needs to. Cropping once, here, keeps what the person
+ * chose.
  */
-const TARGET_W = 400
-const TARGET_H = 500
+const TARGET_W = 480
+const TARGET_H = 480
 
 /** Anything bigger than this is almost certainly not a photo of a face. */
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 /**
- * Re-encode a chosen image to a fixed portrait size before it ever leaves the
+ * Re-encode a chosen image to a fixed square size before it ever leaves the
  * browser. Two reasons: a phone photo is several megabytes and none of that
- * detail survives a 20mm print, and a fixed aspect ratio means the card layout
+ * detail survives a 19mm print, and a fixed aspect ratio means the card layout
  * cannot be broken by whatever shape someone happens to upload.
  *
  * The crop is centred and covers the frame, so a landscape photo loses its

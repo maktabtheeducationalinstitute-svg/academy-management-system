@@ -28,10 +28,17 @@ function ChallanSlipContent({
   monthLabel: string
   invoice: Invoice
 }) {
+  // Everything the payer owes on this slip, in one figure. Pending dues, fine
+  // and exam fund are charges for this month like any other, so they are added
+  // even when the tuition itself has been paid — a fine settled separately is
+  // marked by the office, not assumed from the tuition's status.
   const totalDue =
     (invoice.status === 'paid' ? 0 : netInvoiceAmount(invoice)) +
     (!student.admission_fee_paid ? student.admission_fee_amount : 0) +
-    (!student.security_fee_paid ? student.security_fee_amount : 0)
+    (!student.security_fee_paid ? student.security_fee_amount : 0) +
+    invoice.pending_dues +
+    invoice.fine +
+    invoice.exam_fund
 
   return (
     <div className="relative rounded-lg border border-slate-300 p-4 dark:border-slate-600">
@@ -73,6 +80,24 @@ function ChallanSlipContent({
             <span className="font-semibold">{formatCurrency(student.security_fee_amount)}</span>
           </div>
         )}
+        {invoice.pending_dues > 0 && (
+          <div className="flex justify-between">
+            <span className="text-slate-500 dark:text-slate-400">Pending Dues</span>
+            <span className="font-semibold">{formatCurrency(invoice.pending_dues)}</span>
+          </div>
+        )}
+        {invoice.exam_fund > 0 && (
+          <div className="flex justify-between">
+            <span className="text-slate-500 dark:text-slate-400">Exam Fund</span>
+            <span className="font-semibold">{formatCurrency(invoice.exam_fund)}</span>
+          </div>
+        )}
+        {invoice.fine > 0 && (
+          <div className="flex justify-between">
+            <span className="text-slate-500 dark:text-slate-400">Fine</span>
+            <span className="font-semibold">{formatCurrency(invoice.fine)}</span>
+          </div>
+        )}
         {invoice.discount > 0 && (
           <div className="flex justify-between">
             <span className="text-slate-500 dark:text-slate-400">Discount</span>
@@ -111,6 +136,9 @@ export function FeeChallanPage() {
   const [challanLoading, setChallanLoading] = useState(false)
   const [challanError, setChallanError] = useState<string | null>(null)
   const [dueDateDraft, setDueDateDraft] = useState('')
+  // Entered against the month being viewed, not the student, so last month's
+  // fine does not follow them into next month's challan.
+  const [chargeDrafts, setChargeDrafts] = useState({ pending_dues: '', fine: '', exam_fund: '' })
   const printAreaRef = useRef<HTMLDivElement>(null)
 
   async function load() {
@@ -216,6 +244,39 @@ export function FeeChallanPage() {
     load()
   }
 
+  async function saveCharges() {
+    if (!challanInvoice) return
+    const payload: Record<string, number> = {}
+    for (const [key, label] of [
+      ['pending_dues', 'Pending dues'],
+      ['fine', 'Fine'],
+      ['exam_fund', 'Exam fund'],
+    ] as const) {
+      const value = Number(chargeDrafts[key])
+      if (Number.isNaN(value) || value < 0) {
+        show(`${label} must be a non-negative number.`, 'error')
+        return
+      }
+      payload[key] = value
+    }
+    const { data, error } = await supabase
+      .from('invoices')
+      .update(payload)
+      .eq('id', challanInvoice.id)
+      .select()
+      .single()
+    if (error) {
+      show(friendlyError(error.message), 'error')
+      return
+    }
+    // Re-read rather than patching state by hand, so the printed slip always
+    // shows what the database actually holds.
+    setChallanInvoice(data as Invoice)
+    fillChargeDrafts(data as Invoice)
+    show('Challan charges updated.')
+    load()
+  }
+
   // Discount applies to this month's invoice — the amount actually due right
   // now — rather than retroactively rewriting past unpaid months.
   async function saveInlineDiscount(student: Student, invoice: Invoice) {
@@ -290,6 +351,7 @@ export function FeeChallanPage() {
     if (existing.data) {
       const inv = existing.data as Invoice
       setChallanInvoice(inv)
+      fillChargeDrafts(inv)
       setDueDateDraft(inv.due_date ?? defaultDueDate(monthValue))
       setChallanLoading(false)
       return
@@ -315,7 +377,20 @@ export function FeeChallanPage() {
       return
     }
     setChallanInvoice(created.data as Invoice)
+    fillChargeDrafts(created.data as Invoice)
     setDueDateDraft(defaultDue)
+  }
+
+  // Drafts start from whatever the invoice already holds. Starting them empty
+  // would make "Save charges" silently zero values the office had entered
+  // earlier, which is exactly the kind of quiet data loss a fee slip must not
+  // have.
+  function fillChargeDrafts(inv: Invoice) {
+    setChargeDrafts({
+      pending_dues: String(inv.pending_dues ?? 0),
+      fine: String(inv.fine ?? 0),
+      exam_fund: String(inv.exam_fund ?? 0),
+    })
   }
 
   function defaultDueDate(monthValue: string): string {
@@ -615,6 +690,36 @@ export function FeeChallanPage() {
                 />
                 <Button variant="secondary" onClick={saveDueDate} disabled={!challanInvoice}>
                   Save
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="no-print mb-4 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+            <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+              Extra charges for {formatMonth(monthValueToDate(challanMonth))}
+            </p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+              {([
+                ['pending_dues', 'Pending dues'],
+                ['exam_fund', 'Exam fund'],
+                ['fine', 'Fine'],
+              ] as const).map(([key, label]) => (
+                <div key={key}>
+                  <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">{label}</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={chargeDrafts[key]}
+                    onChange={(e) => setChargeDrafts({ ...chargeDrafts, [key]: e.target.value })}
+                    disabled={!challanInvoice}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900"
+                  />
+                </div>
+              ))}
+              <div className="flex items-end">
+                <Button variant="secondary" onClick={saveCharges} disabled={!challanInvoice}>
+                  Save charges
                 </Button>
               </div>
             </div>

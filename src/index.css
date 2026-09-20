@@ -68,6 +68,10 @@
      print document already had comfortable headroom at 1.5cm, so this
      only ever gains them margin, it doesn't tighten anything. */
   @page {
+    /* Stated rather than left to the printer. A default of Letter is 6mm
+       narrower than A4, which is enough to clip the second voucher copy off
+       the right edge — and the person printing would have no idea why. */
+    size: A4 portrait;
     margin: 1cm;
   }
 

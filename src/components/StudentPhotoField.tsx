@@ -80,7 +80,7 @@ export function StudentPhotoField({
     <div>
       <LabelText>Photo</LabelText>
       <div className="mt-1 flex items-start gap-3">
-        <div className="flex h-24 w-[76.8px] shrink-0 items-center justify-center overflow-hidden rounded border border-slate-300 bg-slate-100 dark:border-slate-600 dark:bg-slate-900">
+        <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded border border-slate-300 bg-slate-100 dark:border-slate-600 dark:bg-slate-900">
           {shown ? (
             <img src={shown} alt="" className="h-full w-full object-cover" />
           ) : (
@@ -113,8 +113,8 @@ export function StudentPhotoField({
             )}
           </div>
           <p className="mt-1.5 text-xs text-slate-400 dark:text-slate-500">
-            Printed about 20&times;25&nbsp;mm on the card. Any photo works &mdash; it is cropped to a
-            portrait shape and shrunk before saving.
+            Printed about 19&nbsp;mm square on the card. Any photo works &mdash; it is cropped square
+            and shrunk before saving.
           </p>
           {error && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>}
         </div>

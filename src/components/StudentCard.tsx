@@ -51,10 +51,16 @@ export function StudentCard({
 
       <div className="flex flex-1 gap-2.5 px-3 py-1.5">
         {/* Fixed-width column whether or not there is a photo/signature, so a
-            card missing either still prints at exactly the same size. */}
+            card missing either still prints at exactly the same size.
+
+            The photo is square rather than portrait: a passport-shaped frame
+            left the signature squeezed underneath it, and a square crop of a
+            face reads better at this size than a tall one. 19.2mm square also
+            leaves room for the signature strip below without either being
+            cramped. */}
         <div className="mt-0.5 flex w-[19.2mm] shrink-0 flex-col gap-1">
           <div
-            className={`flex w-full items-center justify-center overflow-hidden rounded border border-[#c3ccec] bg-[#eef1fa] ${signatureUrl ? 'h-[15mm]' : 'h-full'}`}
+            className="flex aspect-square w-full items-center justify-center overflow-hidden rounded border border-[#c3ccec] bg-[#eef1fa]"
           >
             {photoUrl ? (
               <img src={photoUrl} alt="" className="h-full w-full object-cover" />

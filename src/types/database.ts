@@ -89,6 +89,14 @@ export interface Invoice {
   month: string
   amount: number
   discount: number
+  /**
+   * Extra charges for this month, entered by the office. They sit on the
+   * invoice rather than the student because each describes one month: a fine
+   * in September is not a fine in October, and a carried balance changes.
+   */
+  pending_dues: number
+  fine: number
+  exam_fund: number
   status: InvoiceStatus
   payment_date: string | null
   due_date: string | null
@@ -380,7 +388,7 @@ export interface Database {
         Row: Invoice
         Insert: InsertOf<
           Invoice,
-          'id' | 'discount' | 'status' | 'payment_date' | 'due_date' | 'reminder_sent_at' | 'created_at'
+          'id' | 'discount' | 'pending_dues' | 'fine' | 'exam_fund' | 'status' | 'payment_date' | 'due_date' | 'reminder_sent_at' | 'created_at'
         >
         Update: Partial<Invoice>
         Relationships: []
