@@ -31,10 +31,18 @@ export function StudentCard({
 }) {
   return (
     <div
-      className="student-card flex flex-col overflow-hidden rounded-lg border border-[#c3ccec] bg-white text-black shadow-sm"
+      className="student-card relative flex flex-col overflow-hidden rounded-lg border border-[#c3ccec] bg-white text-black shadow-sm"
       style={{ width: '90mm', height: '55mm' }}
     >
-      <div className="flex items-center gap-2 border-b-2 border-[#f2c14e] bg-[#1e2a6b] px-3 py-1.5">
+      {/* Same faint crest as the back. It sits behind everything: the navy
+          header, the photo frame and the barcode all paint their own opaque
+          backgrounds over it, so it only shows on the white body and the
+          barcode stays exactly as scannable as before. */}
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-[0.06]">
+        <img src={logoUrl} alt="" className="h-[42mm] w-[42mm] object-contain" />
+      </div>
+
+      <div className="relative flex items-center gap-2 border-b-2 border-[#f2c14e] bg-[#1e2a6b] px-3 py-1.5">
         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white p-0.5">
           <img src={logoUrl} alt="" className="h-full w-full object-contain" />
         </div>
@@ -49,7 +57,7 @@ export function StudentCard({
         </p>
       </div>
 
-      <div className="flex flex-1 gap-2.5 px-3 py-1.5">
+      <div className="relative flex flex-1 gap-2.5 px-3 py-1.5">
         {/* Fixed-width column whether or not there is a photo/signature, so a
             card missing either still prints at exactly the same size.
 
@@ -106,7 +114,7 @@ export function StudentCard({
         </div>
       </div>
 
-      <div className="border-t border-[#c3ccec] px-3 py-1 text-center">
+      <div className="relative border-t border-[#c3ccec] px-3 py-1 text-center">
         <p className="text-[6.5px] font-semibold text-[#3a4a9c]">
           This card is valid upto {student.session || '—'}
         </p>
