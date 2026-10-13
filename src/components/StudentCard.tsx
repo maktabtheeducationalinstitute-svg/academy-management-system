@@ -70,11 +70,19 @@ export function StudentCard({
               </span>
             )}
           </div>
-          {signatureUrl && (
-            <div className="flex h-[7mm] w-full items-center justify-center overflow-hidden rounded border border-[#c3ccec] bg-white">
-              <img src={signatureUrl} alt="Principal's signature" className="h-full w-full object-contain p-0.5" />
+          {/* Always drawn, signature uploaded or not, so the line and label
+              print the same on every card and a missing signature just
+              leaves the space above the line blank for a pen. */}
+          <div className="mt-0.5 w-full">
+            <div className="flex h-[6.5mm] w-full items-end justify-center overflow-hidden">
+              {signatureUrl && (
+                <img src={signatureUrl} alt="Principal's signature" className="max-h-full max-w-full object-contain" />
+              )}
             </div>
-          )}
+            <div className="border-t border-slate-700 pt-px text-center text-[5.5px] font-semibold leading-none text-slate-700">
+              Principal Signature
+            </div>
+          </div>
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col justify-between">
@@ -113,9 +121,9 @@ export function StudentCard({
 // different students' fronts). The student's name is repeated here so the
 // back alone still identifies whose card it is; everything else — the
 // institute's real address (the same one already used on exam papers,
-// not an invented one), the property/return notice, the location QR code,
-// and the signature line — is the same standard back-of-ID content for
-// every student.
+// not an invented one), the property/return notice and the location QR
+// code — is the same standard back-of-ID content for every student. The
+// principal's signature lives on the front, under the photo.
 //
 // The QR code is one fixed image (encoding the academy's physical address),
 // not a per-student generated code — every card back prints the identical
@@ -158,10 +166,6 @@ export function StudentCardBack({ student }: { student: Student }) {
               Scan for location
             </p>
           </div>
-        </div>
-
-        <div className="w-full border-t border-[#c3ccec] pt-1">
-          <p className="text-[6px] font-semibold uppercase tracking-widest text-[#3a4a9c]">Authorized Signatory</p>
         </div>
       </div>
     </div>
